@@ -12,6 +12,7 @@ interface BackupViewProps {
     custoPadraoDiario: number;
     shopping_list?: any[];
   }) => void;
+  onClearHistoryAndAvarias?: () => void;
   onBack: () => void;
 }
 
@@ -20,6 +21,7 @@ export default function BackupView({
   manutencoes,
   custoPadraoDiario,
   onRestoreBackup,
+  onClearHistoryAndAvarias,
   onBack
 }: BackupViewProps) {
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
@@ -252,6 +254,35 @@ export default function BackupView({
               accept=".json"
               className="hidden"
             />
+          </div>
+
+          {/* Sessão de Limpeza para Produção / Servidor */}
+          <div className="bg-rose-950/20 border border-rose-500/20 rounded-xl p-4 space-y-3 mt-4">
+            <h3 className="text-xs font-semibold text-rose-400 uppercase tracking-wider flex items-center gap-1.5 font-display">
+              <span className="w-1.5 h-1.5 bg-rose-500 rounded-full"></span> Preparação para o Servidor (Limpar registros)
+            </h3>
+            <p className="text-xs text-slate-350 leading-relaxed font-sans">
+              Deseja resetar todo o histórico de manutenção de forma segura e apagar quaisquer checklists de avaria registrados? Isso deixará o aplicativo limpo e pronto para o upload definitivo no servidor.
+            </p>
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Atenção: Você tem certeza que deseja zerar permanentemente todo o histórico de manutenções e o cadastro de avarias de todos os veículos?")) {
+                    if (onClearHistoryAndAvarias) {
+                      onClearHistoryAndAvarias();
+                      setStatusMessage({
+                        text: 'Histórico de manutenções e avarias zerados com sucesso! O aplicativo já pode ser enviado ao servidor de forma limpa.',
+                        type: 'success'
+                      });
+                    }
+                  }
+                }}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-rose-950/20"
+              >
+                ⚠️ Zerar Histórico e Avarias
+              </button>
+            </div>
           </div>
         </div>
       </div>

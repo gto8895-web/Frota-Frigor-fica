@@ -315,6 +315,12 @@ export default function App() {
     setCustoPadraoDiario(data.custoPadraoDiario);
   };
 
+  const handleClearHistoryAndAvarias = () => {
+    setManutencoes([]);
+    localStorage.setItem('ff_manutencoes', JSON.stringify([]));
+    localStorage.setItem('frigofrota_avarias', JSON.stringify({}));
+  };
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col justify-between">
       
@@ -582,6 +588,7 @@ export default function App() {
             manutencoes={manutencoes}
             custoPadraoDiario={custoPadraoDiario}
             onRestoreBackup={handleRestoreBackup}
+            onClearHistoryAndAvarias={handleClearHistoryAndAvarias}
             onBack={() => setTabAtiva('dashboard')}
           />
         )}
