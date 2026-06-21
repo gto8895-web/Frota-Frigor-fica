@@ -1,0 +1,332 @@
+import React, { useState } from 'react';
+import { Veiculo, Manutencao, StatusManutencao } from '../types';
+import { Wrench, Trash2, Calendar, Filter, Pencil } from 'lucide-react';
+
+interface MaintenanceViewProps {
+  manutencoes: Manutencao[];
+  veiculos: Veiculo[];
+  onAddMaintenance: (m: Omit<Manutencao, 'id'>) => void;
+  onUpdateMaintenanceStatus: (id: string, status: StatusManutencao) => void;
+  onDeleteMaintenance: (id: string, idsOriginais?: string[]) => void;
+  onUpdateMaintenance: (id: string, updates: { descricao: string; custo: number }, idsOriginais?: string[]) => void;
+  dataReferencia: string;
+}
+
+interface GroupedManutencao extends Manutencao {
+  idsOriginais: string[];
+}
+
+export default function MaintenanceView({
+  manutencoes,
+  veiculos,
+  onDeleteMaintenance,
+  onUpdateMaintenance
+}: MaintenanceViewProps) {
+  const [selecaoVeiculoId, setSelecaoVeiculoId] = useState('todos');
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editandoDescricao, setEditandoDescricao] = useState<string>('');
+  const [editandoCusto, setEditandoCusto] = useState<string>('0');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  
+  // Função para agrupar manutenções do mesmo veículo na mesma data
+  const agruparManutencoes = (lista: Manutencao[]): GroupedManutencao[] => {
+    const grupos: { [chave: string]: Manutencao[] } = {};
+    
+    lista.forEach(m => {
+      const key = `${m.veiculoId}_${m.data}`;
+      if (!grupos[key]) {
+        grupos[key] = [];
+      }
+      grupos[key].push(m);
+    });
+
+    return Object.values(grupos).map(membros => {
+      // Ordenação estável por ID descentente para definir o principal do grupo
+      const ordinario = [...membros].sort((a, b) => b.id.localeCompare(a.id));
+      const principal = ordinario[0];
+
+      if (ordinario.length === 1) {
+        return {
+          ...principal,
+          idsOriginais: [principal.id]
+        };
+      }
+
+      // O valor cobrado é por caminhão (1 valor fixo, não a soma das quantidades de manutenção)
+      const custoTotal = ordinario.length > 0 ? Math.max(...ordinario.map(item => item.custo)) : 0;
+
+      // Concatena descrições com " • "
+      const descricoesLimpas = ordinario.map(item => item.descricao.trim());
+      const descricaoConsolidada = descricoesLimpas.join(' • ');
+
+      // Consolidar status
+      let statusConsolidado = principal.status;
+      if (ordinario.some(item => item.status === 'em_andamento')) {
+        statusConsolidado = 'em_andamento';
+      } else if (ordinario.every(item => item.status === 'concluida')) {
+        statusConsolidado = 'concluida';
+      } else if (ordinario.some(item => item.status === 'concluida')) {
+        statusConsolidado = 'em_andamento';
+      }
+
+      return {
+        ...principal,
+        descricao: descricaoConsolidada,
+        custo: custoTotal,
+        status: statusConsolidado,
+        idsOriginais: ordinario.map(item => item.id)
+      };
+    });
+  };
+
+  // Filtrar as manutenções com base no veículo selecionado
+  const manutencoesFiltradas = manutencoes.filter(m => {
+    // Filtro por veículo selecionado no dropdown
+    if (selecaoVeiculoId !== 'todos') {
+      if (m.veiculoId !== selecaoVeiculoId) {
+        return false;
+      }
+    }
+
+    return true;
+  });
+
+  // Agrupar as manutenções por veículo e data
+  const manutencoesAgrupadas = agruparManutencoes(manutencoesFiltradas);
+
+  // Ordenar decrescente para que a mais recente (data e hora) fique no topo da lista
+  const manutencoesOrdenadas = [...manutencoesAgrupadas].sort((a, b) => {
+    // 1º Comparar data desc
+    const cmpData = b.data.localeCompare(a.data);
+    if (cmpData !== 0) return cmpData;
+
+    // 2º Se mesma data, comparar hora desc
+    const horaA = a.hora || '00:00:00';
+    const horaB = b.hora || '00:00:00';
+    const cmpHora = horaB.localeCompare(horaA);
+    if (cmpHora !== 0) return cmpHora;
+
+    // 3º Fallback id desc
+    return b.id.localeCompare(a.id);
+  });
+
+  const formatarDataBR = (dataStr: string) => {
+    if (!dataStr) return '';
+    const isoDateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const match = dataStr.match(isoDateRegex);
+    if (match) {
+      const [_, ano, mes, dia] = match;
+      return `${dia}/${mes}/${ano}`;
+    }
+    return dataStr;
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Cabeçalho Limpo */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-800 pb-4">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-white flex items-center gap-2">
+            <Wrench className="w-6 h-6 text-sky-400" />
+            Histórico de Manutenções
+          </h2>
+        </div>
+        <div className="bg-sky-950/40 px-3 py-1 rounded-xl border border-sky-800/40 text-sky-400 font-mono text-xs font-bold mt-2 md:mt-0">
+          Registros: {manutencoesOrdenadas.length}
+        </div>
+      </div>
+
+      {/* Filtro por Placa de Veículo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3 bg-[#1e293b]/70 p-4 rounded-xl border border-slate-800">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-sky-400 shrink-0" />
+          <span className="text-xs font-semibold text-slate-300">Filtrar por Veículo (Placa):</span>
+          <select
+            className="bg-[#020617]/90 text-white text-sm py-2 px-3 rounded-lg border border-slate-700/80 focus:outline-none focus:border-sky-500 cursor-pointer min-w-[200px] font-sans"
+            value={selecaoVeiculoId}
+            onChange={(e) => setSelecaoVeiculoId(e.target.value)}
+          >
+            <option value="todos">Todos os Veículos</option>
+            {veiculos.map(v => (
+              <option key={v.id} value={v.id}>
+                {v.placa} ({v.marcaCaminhao})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Lista Simples de Histórico */}
+      {manutencoesOrdenadas.length === 0 ? (
+        <div className="bg-[#1e293b] border border-slate-800 rounded-2xl py-16 px-6 text-center shadow-lg max-w-lg mx-auto">
+          <Calendar className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+          <p className="text-slate-250 font-semibold text-base mb-1">Nenhum registro de manutenção no histórico.</p>
+          <p className="text-slate-400 text-xs text-center">
+            Aba "Frota" → Botão "Lançar Manutenção" em um caminhão para registrar uma nova manutenção.
+          </p>
+        </div>
+      ) : (
+        <div className="space-y-3 max-w-4xl mx-auto">
+          {manutencoesOrdenadas.map((m, index) => {
+            const veiculo = veiculos.find(v => v.id === m.veiculoId);
+            const numRegistro = manutencoesOrdenadas.length - index;
+
+            return (
+              <div 
+                key={m.id}
+                className="bg-[#1e293b] border border-slate-805 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all hover:bg-slate-800/[0.15] border-slate-800"
+              >
+                {/* Lado Esquerdo: Info da manutenção e do veículo */}
+                <div className="flex items-start gap-3.5 flex-1 min-w-0">
+                  <div className="bg-[#020617]/80 h-9 w-9 rounded-lg flex items-center justify-center font-mono text-xxs font-bold text-sky-450 border border-slate-800 shrink-0 text-sky-400 select-none">
+                    #{numRegistro.toString().padStart(2, '0')}
+                  </div>
+                  
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xxs font-mono font-semibold text-slate-400 bg-slate-950/40 px-2 py-0.5 rounded border border-slate-800/40">
+                        {formatarDataBR(m.data)}{m.hora ? ` às ${m.hora.substring(0, 5)}` : ''}
+                      </span>
+                      {veiculo && (
+                        <span className="text-xxs font-bold bg-sky-950/40 text-sky-400 px-2 py-0.5 rounded border border-sky-800/30">
+                          {veiculo.placa} • {veiculo.marcaCaminhao} {veiculo.modelo}
+                        </span>
+                      )}
+                    </div>
+                    
+                    {editandoId === m.id ? (
+                      <div className="flex flex-col gap-2 mt-1 w-full max-w-lg">
+                        <textarea
+                          className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-sans"
+                          value={editandoDescricao}
+                          onChange={(e) => setEditandoDescricao(e.target.value)}
+                          rows={3}
+                          placeholder="Escreva a descrição do serviço..."
+                        />
+                        
+                        <div className="flex flex-wrap items-center gap-3">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Custo:</span>
+                            <div className="relative flex items-center">
+                              <span className="absolute left-2.5 text-[11px] text-slate-400 font-bold">R$</span>
+                              <input
+                                type="number"
+                                step="any"
+                                min="0"
+                                value={editandoCusto}
+                                onChange={(e) => setEditandoCusto(e.target.value)}
+                                className="bg-[#020617] border border-slate-700 text-white font-bold text-xs rounded-md pl-8 pr-2 py-1 w-28 focus:outline-none focus:border-sky-500"
+                                placeholder="0,00"
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditandoCusto("0");
+                              if (!editandoDescricao.toUpperCase().startsWith("(REVISÃO)")) {
+                                setEditandoDescricao(prev => `(REVISÃO) ${prev.trim()}`);
+                              }
+                            }}
+                            className="text-xs text-amber-500 hover:text-amber-400 font-bold underline cursor-pointer transition-colors animate-pulse"
+                            title="Zerar valor e classificar como REVISÃO"
+                          >
+                            Revisão
+                          </button>
+                        </div>
+
+                        <div className="flex gap-2 mt-1">
+                          <button
+                            onClick={() => {
+                              if (editandoDescricao.trim()) {
+                                const parsedCusto = parseFloat(editandoCusto);
+                                const finalCusto = isNaN(parsedCusto) ? 0 : Math.max(0, parsedCusto);
+                                onUpdateMaintenance(m.id, {
+                                  descricao: editandoDescricao.trim(),
+                                  custo: finalCusto
+                                }, m.idsOriginais);
+                                setEditandoId(null);
+                              }
+                            }}
+                            className="bg-sky-500 hover:bg-sky-400 text-slate-950 text-xxs font-bold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+                          >
+                            Salvar
+                          </button>
+                          <button
+                            onClick={() => setEditandoId(null)}
+                            className="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xxs font-semibold px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium text-slate-105 font-sans break-words text-slate-100">
+                        {m.descricao}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-3 text-[11px] text-slate-400">
+                      <span className="text-emerald-400 font-semibold font-mono">R$ {m.custo.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Lado Direito: Ações */}
+                <div className="flex items-center gap-2.5 self-end sm:self-center font-sans">
+                  {confirmDeleteId === m.id ? (
+                    <div className="flex items-center gap-1.5 bg-rose-950/40 border border-rose-900/60 p-1 rounded-lg">
+                      <span className="text-[10px] text-rose-300 font-semibold px-1">Excluir?</span>
+                      <button
+                        onClick={() => {
+                          onDeleteMaintenance(m.id, m.idsOriginais);
+                          setConfirmDeleteId(null);
+                        }}
+                        className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xxs px-2 py-1 rounded cursor-pointer transition-colors"
+                      >
+                        Sim
+                      </button>
+                      <button
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xxs px-2 py-1 rounded cursor-pointer transition-colors"
+                      >
+                        Não
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      {editandoId !== m.id && (
+                        <button
+                          id={`btn-edit-m-hist-${m.id}`}
+                          onClick={() => {
+                            setEditandoId(m.id);
+                            setEditandoDescricao(m.descricao);
+                            setEditandoCusto(m.custo.toString());
+                          }}
+                          className="p-1.5 text-slate-400 hover:text-sky-400 hover:bg-sky-950/30 rounded-lg border border-transparent hover:border-sky-900/40 transition-colors cursor-pointer"
+                          title="Editar Registro"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      <button
+                        id={`btn-delete-m-hist-${m.id}`}
+                        onClick={() => setConfirmDeleteId(m.id)}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-950/30 rounded-lg border border-transparent hover:border-rose-900/40 transition-colors cursor-pointer"
+                        title="Excluir do Histórico"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

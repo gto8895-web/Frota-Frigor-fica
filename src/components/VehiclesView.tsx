@@ -1,0 +1,1033 @@
+import React, { useState } from 'react';
+import { Veiculo, StatusVeiculo, StatusRefrigeracao, Manutencao, Avaria } from '../types';
+import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight } from 'lucide-react';
+
+interface VehiclesViewProps {
+  veiculos: Veiculo[];
+  manutencoes?: Manutencao[];
+  custoPadraoDiario: number;
+  onAddVehicle: (v: Omit<Veiculo, 'id'>) => void;
+  onUpdateVehicle: (v: Veiculo) => void;
+  onDeleteVehicle: (id: string) => void;
+  onSimulateTemperatures: () => void;
+  onAddMaintenance?: (m: Omit<Manutencao, 'id'>) => void;
+}
+
+export default function VehiclesView({
+  veiculos,
+  manutencoes = [],
+  custoPadraoDiario,
+  onAddVehicle,
+  onUpdateVehicle,
+  onDeleteVehicle,
+  onSimulateTemperatures,
+  onAddMaintenance
+}: VehiclesViewProps) {
+  const [filtroStatus, setFiltroStatus] = useState<string>('todos');
+  const [selecaoVeiculoId, setSelecaoVeiculoId] = useState<string>('todos');
+  
+  // Controle de cadastro
+  const [mostrarForm, setMostrarForm] = useState<boolean>(false);
+  
+  // States do formulário de veículo
+  const [marcaCaminhao, setMarcaCaminhao] = useState<string>('Volkswagen');
+  const [modelo, setModelo] = useState<string>('');
+  const [placa, setPlaca] = useState<string>('');
+  const [ano, setAno] = useState<number>(new Date().getFullYear());
+  const [tipoRefrigeracao, setTipoRefrigeracao] = useState<string>('Thermo King T-880R');
+  const [temperaturaAlvo, setTemperaturaAlvo] = useState<number>(-18);
+  const [capacidadeCarga, setCapacidadeCarga] = useState<number>(10);
+  const [status, setStatus] = useState<StatusVeiculo>('disponivel');
+
+  // Modo de edição
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [editPlaca, setEditPlaca] = useState<string>('');
+  const [editMarca, setEditMarca] = useState<string>('');
+  const [editModelo, setEditModelo] = useState<string>('');
+  const [editStatus, setEditStatus] = useState<StatusVeiculo>('disponivel');
+  const [editUltimaManutencao, setEditUltimaManutencao] = useState<string>('');
+  const [confirmDeleteVeicId, setConfirmDeleteVeicId] = useState<string | null>(null);
+
+  // Detalhes do Veículo (Histórico e Avarias)
+  const [veiculoDetalhadoId, setVeiculoDetalhadoId] = useState<string | null>(null);
+  const [avariasMap, setAvariasMap] = useState<Record<string, Avaria[]>>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_avarias');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [novaAvariaTexto, setNovaAvariaTexto] = useState<string>('');
+
+  const handleAdicionarAvaria = (veiculoId: string) => {
+    const texto = novaAvariaTexto.trim();
+    if (!texto) return;
+
+    const novaAvaria: Avaria = {
+      id: Math.random().toString(36).substring(2, 9),
+      veiculoId,
+      descricao: texto,
+      dataCadastrada: new Date().toLocaleDateString('pt-BR'),
+      resolvido: false
+    };
+
+    const novasAvarias = {
+      ...avariasMap,
+      [veiculoId]: [novaAvaria, ...(avariasMap[veiculoId] || [])]
+    };
+
+    setAvariasMap(novasAvarias);
+    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
+    setNovaAvariaTexto('');
+  };
+
+  const handleToggleAvaria = (veiculoId: string, avariaId: string) => {
+    const listaAtualizada = (avariasMap[veiculoId] || []).map(av => 
+      av.id === avariaId ? { ...av, resolvido: !av.resolvido } : av
+    );
+
+    const novasAvarias = {
+      ...avariasMap,
+      [veiculoId]: listaAtualizada
+    };
+
+    setAvariasMap(novasAvarias);
+    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
+  };
+
+  const handleExcluirAvaria = (veiculoId: string, avariaId: string) => {
+    const listaAtualizada = (avariasMap[veiculoId] || []).filter(av => av.id !== avariaId);
+
+    const novasAvarias = {
+      ...avariasMap,
+      [veiculoId]: listaAtualizada
+    };
+
+    setAvariasMap(novasAvarias);
+    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
+  };
+
+  // Lançar Manutenção Modal / Moldura
+  const [modalManutencaoVeiculoId, setModalManutencaoVeiculoId] = useState<string | null>(null);
+  const [textoManutencao, setTextoManutencao] = useState<string>('');
+  const [opcoesPredefinidas, setOpcoesPredefinidas] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_opcoes_manutencao');
+      return saved ? JSON.parse(saved) : [
+        'Troca de Correia',
+        'Troca de Ventilador',
+        'Carga de Gás',
+        'Troca do Compressor',
+        'Troca Chicote Elétrico',
+        'Troca de Válvula'
+      ];
+    } catch {
+      return [
+        'Troca de Correia',
+        'Troca de Ventilador',
+        'Carga de Gás',
+        'Troca do Compressor',
+        'Troca Chicote Elétrico',
+        'Troca de Válvula'
+      ];
+    }
+  });
+  const [novaOpcaoTexto, setNovaOpcaoTexto] = useState<string>('');
+
+  const handleAdicionarOpcao = () => {
+    const textoLimpo = novaOpcaoTexto.trim();
+    if (!textoLimpo) return;
+    if (opcoesPredefinidas.includes(textoLimpo)) {
+      return;
+    }
+    const novasOpcoes = [...opcoesPredefinidas, textoLimpo];
+    setOpcoesPredefinidas(novasOpcoes);
+    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(novasOpcoes));
+    setNovaOpcaoTexto('');
+  };
+
+  const handleRemoverOpcao = (e: React.MouseEvent, op: string) => {
+    e.stopPropagation(); // Evita ativar/remover item do texto
+    const novasOpcoes = opcoesPredefinidas.filter(o => o !== op);
+    setOpcoesPredefinidas(novasOpcoes);
+    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(novasOpcoes));
+  };
+
+  const handleSubmeter = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!placa.trim() || !modelo.trim()) {
+      alert('Por favor, preencha a placa e o modelo do caminhão frigorífico.');
+      return;
+    }
+
+    // Validação básica de placa brasileira ou Mercosul
+    const plateUpper = placa.toUpperCase().replace(/[^A-Z0-9-]/g, '');
+
+    onAddVehicle({
+      placa: plateUpper,
+      marcaCaminhao,
+      modelo,
+      ano,
+      tipoRefrigeracao,
+      temperaturaAlvo: Number(temperaturaAlvo),
+      temperaturaAtual: Number(temperaturaAlvo) + (Math.random() * 1.5 - 0.75), // Começa próximo ao alvo
+      capacidadeCarga: Number(capacidadeCarga),
+      status,
+      statusRefrigeracao: status === 'disponivel' ? 'ok' : status === 'alerta' ? 'degradado' : 'falha',
+      ultimaManutencao: undefined
+    });
+
+    // Resetar campos
+    setModelo('');
+    setPlaca('');
+    setAno(new Date().getFullYear());
+    setTemperaturaAlvo(-18);
+    setCapacidadeCarga(10);
+    setStatus('disponivel');
+    setMostrarForm(false);
+  };
+
+  const salvarEdicaoRapida = (v: Veiculo) => {
+    onUpdateVehicle({
+      ...v,
+      placa: editPlaca.toUpperCase(),
+      marcaCaminhao: editMarca,
+      modelo: editModelo,
+      status: editStatus,
+      statusRefrigeracao: editStatus === 'disponivel' ? 'ok' : editStatus === 'alerta' ? 'degradado' : 'falha',
+      ultimaManutencao: editUltimaManutencao
+    });
+    setEditandoId(null);
+  };
+
+  const iniciarEdicaoRapida = (v: Veiculo) => {
+    setEditandoId(v.id);
+    setEditPlaca(v.placa);
+    setEditMarca(v.marcaCaminhao);
+    setEditModelo(v.modelo);
+    setEditStatus(v.status);
+    setEditUltimaManutencao(v.ultimaManutencao || '');
+  };
+
+  const abrirMolduraManutencao = (v: Veiculo) => {
+    setModalManutencaoVeiculoId(v.id);
+    const txt = obterTextoManutencao(v.ultimaManutencao);
+    setTextoManutencao(txt === 'Nenhum registro de manutenção inserido.' ? '' : txt);
+  };
+
+  const obterDataHojeBR = () => {
+    try {
+      const hoje = new Date();
+      const dia = String(hoje.getDate()).padStart(2, '0');
+      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+      const ano = hoje.getFullYear();
+      return `${dia}/${mes}/${ano}`;
+    } catch {
+      return '20/06/2026';
+    }
+  };
+
+  const obterTextoManutencao = (texto?: string) => {
+    if (!texto) return 'Nenhum registro de manutenção inserido.';
+    
+    const isoDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    const brDateRegex = /^\d{2}\/\d{2}\/\d{4}$/;
+    
+    if (isoDateRegex.test(texto) || brDateRegex.test(texto)) {
+      return 'Nenhum registro de manutenção inserido.';
+    }
+    
+    return texto;
+  };
+
+  const formatarDataBR = (dataStr?: string) => {
+    if (!dataStr) return 'Nenhum registro de manutenção inserido.';
+    
+    const isoDateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+    const match = dataStr.match(isoDateRegex);
+    if (match) {
+      const [_, ano, mes, dia] = match;
+      return `${dia}/${mes}/${ano}`;
+    }
+    
+    return dataStr;
+  };
+
+  const salvarNovaManutencao = () => {
+    if (!modalManutencaoVeiculoId) return;
+    const v = veiculos.find(ve => ve.id === modalManutencaoVeiculoId);
+    if (v) {
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+      const dia = String(hoje.getDate()).padStart(2, '0');
+      const dataHojeISO = `${ano}-${mes}-${dia}`;
+      
+      const horas = String(hoje.getHours()).padStart(2, '0');
+      const minutos = String(hoje.getMinutes()).padStart(2, '0');
+      const segundos = String(hoje.getSeconds()).padStart(2, '0');
+      const horaHojeISO = `${horas}:${minutos}:${segundos}`;
+
+      onUpdateVehicle({
+        ...v,
+        ultimaManutencao: dataHojeISO,
+        status: 'manutencao' // Lançar manutenção coloca o veiculo em oficina / manutenção
+      });
+
+      if (onAddMaintenance) {
+        onAddMaintenance({
+          veiculoId: v.id,
+          data: dataHojeISO,
+          hora: horaHojeISO,
+          tipo: 'preventiva',
+          descricao: textoManutencao.trim() || 'Serviço de reparo de refrigeração',
+          custo: custoPadraoDiario,
+          responsavel: 'Oficina Central de Refrigeração',
+          status: 'em_andamento'
+        });
+      }
+    }
+    setModalManutencaoVeiculoId(null);
+    setTextoManutencao('');
+  };
+
+  const toggleOpcaoPredefinida = (op: string) => {
+    const contem = textoManutencao.includes(op);
+    if (contem) {
+      let novoTexto = textoManutencao;
+      if (novoTexto.includes(op + ', ')) {
+        novoTexto = novoTexto.replace(op + ', ', '');
+      } else if (novoTexto.includes(', ' + op)) {
+        novoTexto = novoTexto.replace(', ' + op, '');
+      } else if (novoTexto.includes(op + ',')) {
+        novoTexto = novoTexto.replace(op + ',', '');
+      } else if (novoTexto.includes(',' + op)) {
+        novoTexto = novoTexto.replace(',' + op, '');
+      } else {
+        novoTexto = novoTexto.replace(op, '');
+      }
+      setTextoManutencao(novoTexto.trim());
+    } else {
+      const trimmed = textoManutencao.trim();
+      if (!trimmed) {
+        setTextoManutencao(op);
+      } else if (trimmed.endsWith(',')) {
+        setTextoManutencao(`${trimmed} ${op}`);
+      } else {
+        setTextoManutencao(`${trimmed}, ${op}`);
+      }
+    }
+  };
+
+  // Se o usuário selecionou um veículo para visualizar detalhes
+  if (veiculoDetalhadoId) {
+    const v = veiculos.find(ve => ve.id === veiculoDetalhadoId);
+    if (v) {
+      const avariasDaViatura = avariasMap[v.id] || [];
+      const historicoManutencoes = manutencoes.filter(m => m.veiculoId === v.id);
+
+      return (
+        <div className="space-y-6 animate-fade-in max-w-5xl mx-auto px-1">
+          {/* Header de Voltar */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#1e293b]/50 p-4 rounded-2xl border border-slate-800">
+            <button
+              onClick={() => setVeiculoDetalhadoId(null)}
+              className="flex items-center gap-2 text-slate-300 hover:text-white transition-colors cursor-pointer text-xs font-semibold bg-[#1e293b] border border-slate-705 px-4 py-2.5 rounded-xl"
+            >
+              <ArrowLeft className="w-4 h-4 text-sky-400" />
+              Voltar para Frota
+            </button>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-xs bg-[#020617] border border-slate-755 px-3 py-1.5 rounded-lg font-bold text-sky-400 tracking-wider">
+                {v.placa}
+              </span>
+              {v.status !== 'manutencao' && (
+                <span className={`text-[11px] px-3 py-1.5 rounded-lg font-semibold uppercase tracking-wider border ${
+                  v.status === 'disponivel' 
+                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
+                    : 'bg-yellow-950/40 border-yellow-500/30 text-yellow-400'
+                }`}>
+                  {v.status === 'disponivel' ? 'Disponível' : 'Alerta Climatização'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Ficha Básica - Bento Card */}
+          <div className="bg-[#1e293b] rounded-2xl border border-slate-800 p-5 shadow-lg">
+            <div className="space-y-1">
+              <p className="text-xs text-sky-450 font-bold uppercase tracking-wider">{v.marcaCaminhao}</p>
+              <h1 className="text-2xl font-display font-bold text-white tracking-tight">{v.modelo}</h1>
+              <p className="text-xs text-slate-400 font-mono">Ano de Fabricação: <span className="text-white">{v.ano}</span></p>
+            </div>
+          </div>
+
+          {/* Bento Grid Principal */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            {/* SEÇÃO AVARIAS */}
+            <div className="bg-[#1e293b] rounded-2xl border border-slate-800 p-5 shadow-lg flex flex-col justify-between h-fit gap-4">
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                  <div>
+                    <h2 className="text-sm font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <AlertCircle className="w-4.5 h-4.5 text-amber-500" />
+                      Avarias do Veículo
+                    </h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Check-list de avarias físicas para controle do veículo</p>
+                  </div>
+                  <span className="bg-[#020617] border border-slate-800 px-2.5 py-1 rounded-lg text-xxs font-mono text-slate-350 font-bold">
+                    {avariasDaViatura.filter(av => !av.resolvido).length} pendentes
+                  </span>
+                </div>
+
+                {/* Formulário para inserir nova avaria */}
+                <div className="flex gap-2 mb-4">
+                  <input
+                    type="text"
+                    placeholder="Descreva a avaria para controle..."
+                    value={novaAvariaTexto}
+                    onChange={(e) => setNovaAvariaTexto(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAdicionarAvaria(v.id);
+                      }
+                    }}
+                    className="flex-1 bg-[#020617] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 font-sans"
+                  />
+                  <button
+                    onClick={() => handleAdicionarAvaria(v.id)}
+                    className="bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold px-4 rounded-xl text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <Plus className="w-4 h-4" /> Adicionar
+                  </button>
+                </div>
+
+                {/* Lista de avarias */}
+                <div className="space-y-2 max-h-[340px] overflow-y-auto pr-1">
+                  {avariasDaViatura.length === 0 ? (
+                    <div className="text-center py-10 bg-[#020617]/30 rounded-xl border border-dashed border-slate-800">
+                      <CheckCircle2 className="w-8 h-8 text-emerald-500/70 mx-auto mb-2" />
+                      <p className="text-xs text-slate-300 font-semibold">Sem avarias registradas para este caminhão</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">O veículo não possui danos físicos ou estéticos registrados.</p>
+                    </div>
+                  ) : (
+                    avariasDaViatura.map(av => (
+                      <div
+                        key={av.id}
+                        className={`p-3 rounded-xl border flex items-center justify-between transition-all gap-3 ${
+                          av.resolvido
+                            ? 'bg-slate-900/30 border-slate-800 text-slate-550 opacity-55'
+                            : 'bg-[#020617]/65 border-slate-800 text-white hover:border-slate-750'
+                        }`}
+                      >
+                        <div 
+                          className="flex items-start gap-2.5 flex-1 cursor-pointer select-none"
+                          onClick={() => handleToggleAvaria(v.id, av.id)}
+                        >
+                          <span className={`p-0.5 rounded mt-0.5 transition-colors ${
+                            av.resolvido ? 'text-emerald-400' : 'text-slate-500 hover:text-slate-350'
+                          }`}>
+                            <CheckCircle2 className={`w-4 h-4 ${av.resolvido ? 'opacity-100 text-emerald-500' : 'opacity-25'}`} />
+                          </span>
+                          <div className="space-y-0.5">
+                            <p className={`text-xs font-sans leading-relaxed ${av.resolvido ? 'line-through decoration-slate-650 text-slate-500' : 'font-semibold text-slate-200'}`}>
+                              {av.descricao}
+                            </p>
+                            <span className="text-[9px] font-mono text-slate-500 flex items-center gap-1">
+                              <Calendar className="w-2.5 h-2.5" /> Registrado em {av.dataCadastrada}
+                            </span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleExcluirAvaria(v.id, av.id)}
+                          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-500/15 rounded-lg transition-colors cursor-pointer shrink-0"
+                          title="Remover Avaria"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO HISTÓRICO DE MANUTENÇÃO */}
+            <div className="bg-[#1e293b] rounded-2xl border border-slate-800 p-5 shadow-lg flex flex-col justify-between h-fit gap-4">
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                  <div>
+                    <h2 className="text-sm font-display font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                      <Wrench className="w-4.5 h-4.5 text-sky-400" />
+                      Histórico de Manutenções
+                    </h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Ordens de serviço e manutenções adicionadas deste veículo</p>
+                  </div>
+                  <span className="bg-[#020617] border border-slate-800 px-2.5 py-1 rounded-lg text-xxs font-mono text-sky-400 font-bold">
+                    {historicoManutencoes.length} registradas
+                  </span>
+                </div>
+
+                {/* Lista de manutenções */}
+                <div className="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                  {historicoManutencoes.length === 0 ? (
+                    <div className="text-center py-10 bg-[#020617]/30 rounded-xl border border-dashed border-slate-800">
+                      <Wrench className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                      <p className="text-xs text-slate-350 font-semibold">Nenhuma manutenção encontrada</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-sans">Nenhuma intervenção registrada para esta placa no momento.</p>
+                    </div>
+                  ) : (
+                    historicoManutencoes.map(m => (
+                      <div
+                        key={m.id}
+                        className="bg-[#020617]/50 border border-slate-800/80 rounded-xl p-3.5 space-y-2 relative overflow-hidden"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-mono bg-[#1e293b] border border-slate-850/40 text-sky-300 px-2 py-0.5 rounded">
+                            📅 {m.data.split('-').reverse().join('/')}
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-250 font-sans leading-relaxed">
+                          {m.descricao}
+                        </p>
+
+                        {/* Tipo e custo ocultados a pedido do usuário */}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      );
+    }
+  }
+
+  // Filtrar veículos
+  const veiculosFiltrados = veiculos.filter(v => {
+    const passeStatus = filtroStatus === 'todos' || v.status === filtroStatus;
+    const passePlaca = selecaoVeiculoId === 'todos' || v.id === selecaoVeiculoId;
+    return passeStatus && passePlaca;
+  });
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-display font-bold text-white">Frota Frigorífica Cadastrada</h2>
+          <p className="text-slate-400 text-sm">Gerencie os caminhões, especificações das câmaras térmicas e calibrações de setpoint.</p>
+        </div>
+
+        <div className="flex flex-wrap gap-2.5 w-full sm:w-auto">
+          <button
+            id="btn-toggle-add-vehicle"
+            onClick={() => setMostrarForm(!mostrarForm)}
+            className="flex items-center gap-2 bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm cursor-pointer ml-auto"
+          >
+            {mostrarForm ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+            {mostrarForm ? 'Cancelar' : 'Novo Caminhão'}
+          </button>
+        </div>
+      </div>
+
+      {/* Formulário de Cadastro (Sanitizado & Design Bento) */}
+      {mostrarForm && (
+        <div className="bg-[#1e293b] border border-slate-800 rounded-xl p-5 shadow-md max-w-4xl transition-all duration-200 text-slate-100">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3 mb-4">
+            <h3 className="font-display font-bold text-white flex items-center gap-2">
+              <Truck className="w-5 h-5 text-sky-400" />
+              Especificação de Novo Caminhão Frigorífico
+            </h3>
+            <button 
+              id="form-close-vehicle"
+              onClick={() => setMostrarForm(false)} 
+              className="text-slate-400 hover:text-slate-200 rounded-lg p-1"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmeter} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Montadora</label>
+              <select
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 font-medium focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={marcaCaminhao}
+                onChange={(e) => setMarcaCaminhao(e.target.value)}
+              >
+                <option value="Mercedes-Benz">Mercedes-Benz</option>
+                <option value="Volvo">Volvo</option>
+                <option value="Scania">Scania</option>
+                <option value="Volkswagen">Volkswagen</option>
+                <option value="Iveco">Iveco</option>
+                <option value="MAN">MAN / DAF</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Modelo / Descrição Comercial</label>
+              <input
+                type="text"
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                placeholder="Ex: Atego 2430 6x2"
+                value={modelo}
+                onChange={(e) => setModelo(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Placa (Identificador)</label>
+              <input
+                type="text"
+                maxLength={8}
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm font-mono text-slate-100 uppercase focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                placeholder="Ex: FRG-2B45"
+                value={placa}
+                onChange={(e) => setPlaca(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ano Fabricação</label>
+              <input
+                type="number"
+                min={2000}
+                max={new Date().getFullYear() + 1}
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={ano}
+                onChange={(e) => setAno(Number(e.target.value))}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Equipamento de Frio</label>
+              <input
+                type="text"
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                placeholder="Ex: Thermo King T-880R"
+                value={tipoRefrigeracao}
+                onChange={(e) => setTipoRefrigeracao(e.target.value)}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Capacidade Carga (Tons)</label>
+              <input
+                type="number"
+                step="0.1"
+                min={1}
+                max={50}
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={capacidadeCarga}
+                onChange={(e) => setCapacidadeCarga(Number(e.target.value))}
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Setpoint Térmico Alvo (°C)</label>
+              <input
+                type="number"
+                min={-30}
+                max={25}
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={temperaturaAlvo}
+                onChange={(e) => setTemperaturaAlvo(Number(e.target.value))}
+                required
+                placeholder="Ex: -18 para ultracongelados"
+              />
+              <span className="text-xxs text-slate-400 mt-1 block">Ideal: congelado (-20°C a -18°C), resfriado (2°C a 4°C).</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status Operativo Inicial</label>
+              <select
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 font-medium focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={status}
+                onChange={(e) => setStatus(e.target.value as StatusVeiculo)}
+              >
+                <option value="disponivel">Disponível para Viagem</option>
+                <option value="alerta">Risco de Climatização (Alerta)</option>
+                <option value="manutencao">Retido em Manutenção (Oficina)</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-3 flex justify-end gap-3 border-t border-slate-800 pt-4 mt-2">
+              <button
+                type="button"
+                id="btn-cancel-create-vehicle"
+                onClick={() => setMostrarForm(false)}
+                className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs px-4 py-2 rounded-lg cursor-pointer"
+              >
+                Voltar
+              </button>
+              <button
+                type="submit"
+                id="btn-confirm-create-vehicle"
+                className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold text-xs px-5 py-2 rounded-lg shadow-xs flex items-center gap-1 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" /> Adicionar à Frota
+              </button>
+            </div>
+
+          </form>
+        </div>
+      )}
+
+      {/* Filtro por Placa de Veículo */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3 bg-[#1e293b]/70 p-4 rounded-xl border border-slate-800 shadow-sm">
+        <div className="flex items-center gap-2">
+          <Filter className="w-4 h-4 text-sky-400 shrink-0" />
+          <span className="text-xs font-semibold text-slate-300">Filtrar por Veículo (Placa):</span>
+          <select
+            className="bg-[#020617]/90 text-white text-sm py-2 px-3 rounded-lg border border-slate-700/80 focus:outline-none focus:border-sky-500 cursor-pointer min-w-[200px] font-sans"
+            value={selecaoVeiculoId}
+            onChange={(e) => setSelecaoVeiculoId(e.target.value)}
+          >
+            <option value="todos">Todos os Veículos</option>
+            {veiculos.map(v => (
+              <option key={v.id} value={v.id}>
+                {v.placa} ({v.marcaCaminhao})
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* Listagem de Veículos (Grid responsiva) */}
+      {veiculosFiltrados.length === 0 ? (
+        <div className="bg-[#1e293b] border border-slate-800 rounded-xl py-12 px-6 text-center shadow-xs">
+          <Truck className="w-12 h-12 text-slate-500 mx-auto mb-3" />
+          <p className="text-slate-400 font-medium text-sm">Nenhum caminhão frigorífico encontrado.</p>
+          <p className="text-slate-500 text-xs mt-1">Experimente limpar os filtros ou faça um novo cadastro.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {veiculosFiltrados.map(v => {
+            const isEditando = editandoId === v.id;
+
+            return (
+              <div 
+                key={v.id}
+                className={`transition-all rounded-xl border ${
+                  v.status === 'manutencao'
+                    ? 'border-rose-800 bg-rose-950/10'
+                    : 'border-slate-800 bg-[#1e293b] hover:border-slate-700'
+                } p-5 shadow-sm flex flex-col justify-between`}
+              >
+                <div>
+                  {/* Cabeçalho do Card - Click para Detalhes */}
+                  <div 
+                    onClick={() => {
+                      if (!isEditando) {
+                        setVeiculoDetalhadoId(v.id);
+                      }
+                    }}
+                    className={`space-y-3 ${!isEditando ? 'cursor-pointer group/header hover:opacity-95 transition-all' : ''}`}
+                    title={!isEditando ? "Clique para ver Detalhes, Histórico e Avarias do Veículo" : undefined}
+                  >
+                    {!isEditando ? (
+                      <div className="flex justify-between items-start gap-2">
+                        <div className="flex-1 min-w-0">
+                          <span className="font-mono text-xs bg-[#020617] border border-slate-700 px-2.5 py-1 rounded-md font-bold text-sky-400 tracking-wider">
+                            {v.placa}
+                          </span>
+                          <p className="text-xs font-semibold text-slate-400 mt-2">{v.marcaCaminhao}</p>
+                          <h4 className="font-display font-medium text-white text-base leading-tight mt-0.5 group-hover/header:text-sky-350 transition-colors truncate">
+                            {v.modelo}
+                          </h4>
+                        </div>
+                        <span className="bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-lg p-1.5 hover:bg-sky-500/20 transition-all shrink-0">
+                          <ChevronRight className="w-4 h-4" />
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-400">Placa</label>
+                          <input
+                            type="text"
+                            className="bg-[#020617] border border-slate-700 rounded-lg p-1.5 w-full text-xs font-mono font-bold text-sky-400 focus:outline-none focus:border-sky-400"
+                            value={editPlaca}
+                            onChange={(e) => setEditPlaca(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-400">Marca</label>
+                          <input
+                            type="text"
+                            className="bg-[#020617] border border-slate-700 rounded-lg p-1.5 w-full text-xs text-white focus:outline-none focus:border-sky-450"
+                            value={editMarca}
+                            onChange={(e) => setEditMarca(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-400">Modelo</label>
+                          <input
+                            type="text"
+                            className="bg-[#020617] border border-slate-700 rounded-lg p-1.5 w-full text-xs text-white focus:outline-none focus:border-sky-450"
+                            value={editModelo}
+                            onChange={(e) => setEditModelo(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Seção Manutenção do Veículo */}
+                  <div className="bg-[#020617]/50 border border-slate-800/60 rounded-xl p-3.5 my-4 space-y-2.5">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 block border-b border-slate-800 pb-1 flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Wrench className="w-3.5 h-3.5 text-sky-400" /> Manutenção
+                      </span>
+                      <span className="text-[10px] font-mono font-bold text-sky-400 bg-sky-950/40 px-2 py-0.5 rounded border border-sky-800/40">
+                        {obterDataHojeBR()}
+                      </span>
+                    </span>
+
+                    {!isEditando ? (
+                      <div className="space-y-3 text-xs">
+                        <div>
+                          <textarea
+                            readOnly
+                            rows={3}
+                            className="bg-[#020617]/40 text-slate-200 mt-1 italic font-light font-sans p-2 rounded-lg border border-slate-800 w-full resize-none focus:outline-none"
+                            value={obterTextoManutencao(v.ultimaManutencao)}
+                          />
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => abrirMolduraManutencao(v)}
+                          className="w-full flex items-center justify-center gap-1.5 bg-sky-500 hover:bg-sky-600 font-semibold text-white text-[11px] py-2 px-3 rounded-lg transition-all shadow-lg shadow-sky-500/10 cursor-pointer"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Lançar Manutenção
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 text-xs">
+                        <div>
+                          <label className="block text-[10px] uppercase font-bold text-slate-400 mb-1">Campo Manutenção</label>
+                          <textarea
+                            rows={3}
+                            className="bg-[#020617] border border-slate-700 rounded-lg p-1.5 w-full text-xs text-white focus:outline-none focus:border-sky-400 font-sans"
+                            value={editUltimaManutencao}
+                            onChange={(e) => setEditUltimaManutencao(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Footer do Card */}
+                <div className="border-t border-slate-800 pt-3 flex justify-end items-center mt-2 font-mono">
+                  <div className="flex gap-1.5">
+                    {isEditando ? (
+                      <button
+                        id={`btn-save-edit-${v.id}`}
+                        onClick={() => salvarEdicaoRapida(v)}
+                        className="p-1 px-2.5 bg-emerald-700 hover:bg-emerald-600 text-white rounded-lg text-xxs font-bold flex items-center gap-1 cursor-pointer"
+                      >
+                        <Save className="w-3 h-3" /> Salvar
+                      </button>
+                    ) : (
+                      <>
+                        {confirmDeleteVeicId === v.id ? (
+                          <div className="flex items-center gap-1.5 bg-rose-950/50 border border-rose-900/60 p-1 rounded-lg">
+                            <span className="text-[10px] text-rose-300 font-semibold px-1">Remover frota?</span>
+                            <button
+                              onClick={() => {
+                                onDeleteVehicle(v.id);
+                                setConfirmDeleteVeicId(null);
+                              }}
+                              className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xxs px-2 py-1 rounded cursor-pointer transition-colors"
+                            >
+                              Sim
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteVeicId(null)}
+                              className="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xxs px-2 py-1 rounded cursor-pointer transition-colors"
+                            >
+                              Não
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              id={`btn-init-edit-${v.id}`}
+                              onClick={() => iniciarEdicaoRapida(v)}
+                              className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-sky-400 rounded-lg hover:border-slate-600 border border-slate-700 transition-colors cursor-pointer"
+                              title="Editar veículo"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              id={`btn-delete-vehicle-${v.id}`}
+                              onClick={() => setConfirmDeleteVeicId(v.id)}
+                              className="p-1.5 bg-slate-800 hover:bg-rose-950/40 hover:text-rose-450 text-slate-300 rounded-lg hover:border-rose-900 border border-slate-700 transition-colors cursor-pointer"
+                              title="Excluir caminhão"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Nota Operacional */}
+      <div className="bg-amber-950/20 border border-amber-800/40 p-4 rounded-xl text-xs text-slate-200 flex items-start gap-2 select-none">
+        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+        <div>
+          <span className="font-semibold text-amber-400 block pb-0.5">Dica de Sensor de Climatização:</span>
+          Filtre por <strong>"Câmaras em Alerta"</strong> para avaliar veículos que necessitam de intervenção rápida. Caminhões com desvio acima de 3°C da temperatura planejada alteram automaticamente os status térmicos, exigindo abertura de Ordem de Manutenção de Climatização para prevenir perdas de produtos congelados.
+        </div>
+      </div>
+
+      {/* Moldura Simples de Lançamento de Manutenção (Modal) */}
+      {modalManutencaoVeiculoId && (() => {
+        const v = veiculos.find(ve => ve.id === modalManutencaoVeiculoId);
+        if (!v) return null;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/85 backdrop-blur-xs">
+            <div className="bg-[#1e293b] border border-slate-700 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+              <button
+                onClick={() => setModalManutencaoVeiculoId(null)}
+                className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-2.5 mb-4 pb-3 border-b border-slate-800">
+                <Wrench className="w-5 h-5 text-sky-400 animate-pulse" />
+                <div>
+                  <h3 className="text-lg font-display font-semibold text-white">Lançar Manutenção</h3>
+                  <p className="text-xs text-slate-400 font-mono">Caminhão Placa: <span className="text-sky-450 font-bold text-sky-450">{v.placa}</span> ({v.marcaCaminhao} {v.modelo})</p>
+                </div>
+              </div>
+
+              {/* Lista Selecionável de Opções Rápidas */}
+              <div className="mb-4">
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-400 mb-2">Selecione opções para a descrição da manutenção:</label>
+                
+                {opcoesPredefinidas.length === 0 ? (
+                  <p className="text-xs italic text-slate-500 bg-[#020617] p-3 rounded-xl border border-slate-800 text-center">Nenhuma opção na lista rápida. Adicione uma nova abaixo.</p>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                    {opcoesPredefinidas.map(op => {
+                      const isSelecionado = textoManutencao.includes(op);
+                      return (
+                        <div
+                          key={op}
+                          className={`relative group flex items-center justify-between text-xs rounded-xl border transition-all ${
+                            isSelecionado
+                              ? 'bg-sky-500/10 border-sky-500 text-sky-400 font-semibold'
+                              : 'bg-slate-900 border-slate-800 hover:bg-slate-800 hover:border-slate-700 text-slate-200'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => toggleOpcaoPredefinida(op)}
+                            className="flex-1 text-left p-2.5 truncate cursor-pointer"
+                          >
+                            {op}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleRemoverOpcao(e, op)}
+                            className="p-2 mr-1 text-slate-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer shrink-0"
+                            title="Remover opção"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {/* Adicionar nova opção personalizada à lista */}
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="text"
+                    className="bg-[#020617] border border-slate-700 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400 flex-1 font-sans"
+                    placeholder="Adicionar nova opção personalizada à lista..."
+                    value={novaOpcaoTexto}
+                    onChange={(e) => setNovaOpcaoTexto(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAdicionarOpcao();
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAdicionarOpcao}
+                    className="bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/30 text-sky-400 hover:text-sky-350 text-xs px-3 py-2 rounded-xl transition-all font-semibold flex items-center gap-1.5 cursor-pointer h-full"
+                  >
+                    <Plus className="w-3.5 h-3.5" /> Adicionar
+                  </button>
+                </div>
+              </div>
+
+              {/* Campo para Escrita Manual da Manutenção */}
+              <div className="space-y-2 mb-6">
+                <label className="block text-[10px] uppercase font-bold tracking-wider text-slate-455 text-slate-400">Escrita Manual da Manutenção:</label>
+                <textarea
+                  rows={3}
+                  className="bg-[#020617] border border-slate-700 rounded-xl p-3 w-full text-xs text-white focus:outline-none focus:border-sky-400 placeholder-slate-500 font-sans"
+                  placeholder="Escreva detalhes da manutenção ou selecione um item acima..."
+                  value={textoManutencao}
+                  onChange={(e) => setTextoManutencao(e.target.value)}
+                />
+              </div>
+
+              {/* Botões de Ações */}
+              <div className="flex justify-end gap-3 pt-3 border-t border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setModalManutencaoVeiculoId(null)}
+                  className="px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-705 rounded-xl transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={salvarNovaManutencao}
+                  className="px-5 py-2 text-xs font-semibold bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold rounded-xl shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" /> Gravar Manutenção
+                </button>
+              </div>
+
+            </div>
+          </div>
+        );
+      })()}
+      
+    </div>
+  );
+}

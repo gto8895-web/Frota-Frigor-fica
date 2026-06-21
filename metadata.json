@@ -1,0 +1,6 @@
+{
+  "name": "Gestão de Frota Frigorífica",
+  "description": "Controle de frotas de caminhões frigoríficos, registro de manutenções e gerador de estimativas de orçamentos diários.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
