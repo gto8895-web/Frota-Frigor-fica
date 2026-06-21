@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Veiculo, StatusVeiculo, StatusRefrigeracao, Manutencao, Avaria } from '../types';
-import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight } from 'lucide-react';
+import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight, Camera, RefreshCw, VideoOff, Check } from 'lucide-react';
 
 interface VehiclesViewProps {
   veiculos: Veiculo[];
@@ -25,6 +25,153 @@ export default function VehiclesView({
 }: VehiclesViewProps) {
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [selecaoVeiculoId, setSelecaoVeiculoId] = useState<string>('todos');
+
+  // Scanner de Placa com IA
+  const [abrirScanner, setAbrirScanner] = useState<boolean>(false);
+  const [streaming, setStreaming] = useState<boolean>(false);
+  const [ladoCamera, setLadoCamera] = useState<'environment' | 'user'>('environment');
+  const [erroCamera, setErroCamera] = useState<string | null>(null);
+  const [lendoOCR, setLendoOCR] = useState<boolean>(false);
+  const [resultadoOCR, setResultadoOCR] = useState<string | null>(null);
+  const [veiculoEncontrado, setVeiculoEncontrado] = useState<Veiculo | null>(null);
+  const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
+  const [streamRef, setStreamRef] = useState<MediaStream | null>(null);
+
+  const iniciarCamera = async (facing: 'environment' | 'user', videoEl: HTMLVideoElement | null) => {
+    if (!videoEl) return;
+    
+    // Parar streams anteriores de forma limpa
+    if (streamRef) {
+      streamRef.getTracks().forEach(track => track.stop());
+    }
+
+    try {
+      setErroCamera(null);
+      setStreaming(false);
+
+      const constraints: MediaStreamConstraints = {
+        video: {
+          facingMode: facing,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+        audio: false
+      };
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      videoEl.srcObject = stream;
+      videoEl.play();
+      setStreamRef(stream);
+      setStreaming(true);
+    } catch (err: any) {
+      console.error("Erro ao iniciar câmera:", err);
+      // Fallback para qualquer câmera disponível
+      if (facing === 'environment') {
+        try {
+          const fallbackConstraints = { video: true, audio: false };
+          const stream = await navigator.mediaDevices.getUserMedia(fallbackConstraints);
+          videoEl.srcObject = stream;
+          videoEl.play();
+          setStreamRef(stream);
+          setStreaming(true);
+          return;
+        } catch (fallbackErr) {
+          // Ambos falharam
+        }
+      }
+      setErroCamera("Não foi possível acessar a câmera do aparelho. Por favor, libere a permissão de câmera.");
+    }
+  };
+
+  const desativarCamera = () => {
+    if (streamRef) {
+      streamRef.getTracks().forEach(track => track.stop());
+      setStreamRef(null);
+    }
+    setStreaming(false);
+  };
+
+  const capturarEIdentificar = async (videoEl: HTMLVideoElement | null) => {
+    if (!videoEl) return;
+
+    try {
+      setLendoOCR(true);
+      setErroCamera(null);
+      setResultadoOCR(null);
+      setVeiculoEncontrado(null);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error("Não foi possível processar a imagem.");
+      }
+
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      const res = await fetch('/api/ocr-plate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ image: dataUrl })
+      });
+
+      if (!res.ok) {
+        throw new Error("Serviço de inteligência artificial de OCR indisponível.");
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || "Houve uma falha ao processar a imagem com IA.");
+      }
+
+      const plateDetected = data.plate?.trim() || "";
+      if (plateDetected === "NOT_FOUND" || !plateDetected) {
+        setResultadoOCR("Nenhuma placa de veículo identificada. Tente com outro ângulo.");
+        setLendoOCR(false);
+        return;
+      }
+
+      setResultadoOCR(plateDetected);
+
+      const normalize = (str: string) => str.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const normalizedDetected = normalize(plateDetected);
+
+      // Encontrar correspondência na lista de veículos
+      const match = veiculos.find(v => {
+        const normalizedV = normalize(v.placa);
+        return normalizedV === normalizedDetected || 
+               normalizedV.includes(normalizedDetected) || 
+               normalizedDetected.includes(normalizedV);
+      });
+
+      if (match) {
+        setVeiculoEncontrado(match);
+        setSelecaoVeiculoId(match.id);
+      } else {
+        setVeiculoEncontrado(null);
+      }
+
+    } catch (err: any) {
+      console.error("Erro OCR:", err);
+      setErroCamera(err.message || "Erro de conexão com o servidor de IA.");
+    } finally {
+      setLendoOCR(false);
+    }
+  };
+
+  useEffect(() => {
+    if (abrirScanner && videoRef) {
+      iniciarCamera(ladoCamera, videoRef);
+    }
+    return () => {
+      desativarCamera();
+    };
+  }, [abrirScanner, ladoCamera, videoRef]);
   
   // Controle de cadastro
   const [mostrarForm, setMostrarForm] = useState<boolean>(false);
@@ -688,7 +835,7 @@ export default function VehiclesView({
       )}
 
       {/* Filtro por Placa de Veículo */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-start gap-3 bg-[#1e293b]/70 p-4 rounded-xl border border-slate-800 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-[#1e293b]/70 p-4 rounded-xl border border-slate-800 shadow-sm">
         <div className="flex items-center gap-2">
           <Filter className="w-4 h-4 text-sky-400 shrink-0" />
           <span className="text-xs font-semibold text-slate-300">Filtrar por Veículo (Placa):</span>
@@ -705,6 +852,20 @@ export default function VehiclesView({
             ))}
           </select>
         </div>
+
+        {/* Botão Ler Placa por Câmera */}
+        <button
+          onClick={() => {
+            setAbrirScanner(true);
+            setResultadoOCR(null);
+            setErroCamera(null);
+            setVeiculoEncontrado(null);
+          }}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-400 hover:to-blue-500 text-white font-bold text-xs px-4.5 py-2.5 rounded-xl transition-all shadow-md shadow-sky-500/10 cursor-pointer shrink-0"
+        >
+          <Camera className="w-4 h-4 text-sky-200" />
+          Ler Placa
+        </button>
       </div>
 
       {/* Listagem de Veículos (Grid responsiva) */}
@@ -1027,7 +1188,210 @@ export default function VehiclesView({
           </div>
         );
       })()}
-      
+
+      {/* MODAL OCR SCANNER DE PLACA */}
+      {abrirScanner && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/90 backdrop-blur-md">
+          <div className="bg-[#1e293b] border border-slate-700 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 flex flex-col">
+            
+            {/* Header */}
+            <div className="p-4 border-b border-slate-800 flex justify-between items-center bg-[#1e293b]">
+              <div className="flex items-center gap-2.5">
+                <Camera className="w-5 h-5 text-sky-400" />
+                <div>
+                  <h3 className="text-sm md:text-base font-display font-semibold text-white">Leitor de Placas por Câmera</h3>
+                  <p className="text-[11px] text-slate-400">Aponte a câmera para a placa do caminhão (antiga ou Mercosul)</p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setAbrirScanner(false);
+                  setErroCamera(null);
+                  setResultadoOCR(null);
+                  setVeiculoEncontrado(null);
+                }}
+                className="text-slate-400 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-slate-800 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Camera Area */}
+            <div className="relative bg-[#020617] h-[280px] md:h-[380px] flex items-center justify-center overflow-hidden">
+              {!erroCamera && (
+                <video
+                  ref={(el) => setVideoRef(el)}
+                  className="absolute inset-0 w-full h-full object-cover"
+                  playsInline
+                  muted
+                />
+              )}
+
+              {/* Scanning Laser Line Overlay */}
+              {streaming && !lendoOCR && !resultadoOCR && (
+                <div className="absolute inset-x-0 h-1 bg-emerald-500/80 shadow-[0_0_12px_#10b981] animate-bounce z-10 pointer-events-none" style={{ top: '40%' }} />
+              )}
+
+              {/* Target bracket outline */}
+              {streaming && !resultadoOCR && !lendoOCR && (
+                <div className="absolute border-2 border-dashed border-sky-400/40 rounded-xl w-[75%] h-[35%] max-w-[450px] pointer-events-none flex items-center justify-center animate-pulse">
+                  <div className="text-sky-300 text-[10px] font-mono tracking-wider bg-slate-950/80 px-2 py-1 rounded border border-sky-500/20 uppercase">
+                    Centralize a Placa Aqui
+                  </div>
+                </div>
+              )}
+
+              {/* Loading spinner over the camera */}
+              {lendoOCR && (
+                <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center gap-3 z-20">
+                  <div className="w-10 h-10 border-4 border-sky-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-xs font-semibold text-sky-400 font-mono tracking-widest uppercase animate-pulse">
+                    Identificando placa...
+                  </p>
+                  <p className="text-[10px] text-slate-400">A inteligência artificial do Gemini está analisando a imagem</p>
+                </div>
+              )}
+
+              {/* Camera access error message */}
+              {erroCamera && (
+                <div className="absolute inset-0 bg-[#020617] p-6 flex flex-col items-center justify-center text-center gap-3">
+                  <VideoOff className="w-10 h-10 text-rose-500" />
+                  <p className="text-xs text-rose-450 font-semibold max-w-sm">{erroCamera}</p>
+                  <button
+                    onClick={() => iniciarCamera(ladoCamera, videoRef)}
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-4 py-2 rounded-lg border border-slate-700 cursor-pointer"
+                  >
+                    Tentar Novamente
+                  </button>
+                </div>
+              )}
+
+              {/* No stream state */}
+              {!streaming && !erroCamera && !lendoOCR && (
+                <div className="text-slate-500 text-xs flex flex-col items-center gap-2">
+                  <div className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                  Carregando lente da câmera...
+                </div>
+              )}
+            </div>
+
+            {/* Results Display or Capture Controls */}
+            <div className="p-5 bg-[#1e293b] border-t border-slate-800 space-y-4">
+              
+              {resultadoOCR && (
+                <div className="bg-[#020617]/70 border border-slate-800 p-4 rounded-xl space-y-3.5 animate-fade-in">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <span className="text-[10px] text-slate-500 font-mono block uppercase">Resultado da Leitura</span>
+                      <strong className="text-2xl font-mono tracking-wider text-sky-400">
+                        {resultadoOCR}
+                      </strong>
+                    </div>
+                    {veiculoEncontrado ? (
+                      <span className="bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase">
+                        <Check className="w-3.5 h-3.5" /> Encontrado
+                      </span>
+                    ) : (
+                      <span className="bg-amber-950/50 border border-amber-500/30 text-amber-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase">
+                        <AlertTriangle className="w-3.5 h-3.5" /> Frota Ausente
+                      </span>
+                    )}
+                  </div>
+
+                  {veiculoEncontrado ? (
+                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800/60 flex items-center gap-3">
+                      <Truck className="w-8 h-8 text-sky-400 font-bold" />
+                      <div className="min-w-0">
+                        <p className="text-slate-400 font-sans text-[10px] leading-tight font-bold">{veiculoEncontrado.marcaCaminhao}</p>
+                        <h4 className="text-xs text-white font-display font-bold leading-tight truncate">{veiculoEncontrado.modelo}</h4>
+                        <p className="text-[10px] text-slate-500 mt-0.5">Status operativo: <span className="text-sky-350">{veiculoEncontrado.status}</span></p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 font-sans leading-relaxed">
+                      A placa <strong>{resultadoOCR}</strong> foi identificada com sucesso, mas este veículo não faz parte do cadastro da sua frota atual. Deseja cadastrar este caminhão na frota ou tentar ler outra placa?
+                    </p>
+                  )}
+
+                  <div className="flex items-center gap-2 pt-1 border-t border-slate-800/50">
+                    {veiculoEncontrado ? (
+                      <button
+                        onClick={() => {
+                          setAbrirScanner(false);
+                          setResultadoOCR(null);
+                          setVeiculoEncontrado(null);
+                        }}
+                        className="flex-1 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs font-bold py-2.5 px-4 rounded-xl shadow-md transition-colors cursor-pointer text-center"
+                      >
+                        Filtrar Este Veículo
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setPlaca(resultadoOCR);
+                          setMostrarForm(true);
+                          setAbrirScanner(false);
+                          setResultadoOCR(null);
+                        }}
+                        className="flex-1 bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs font-bold py-2.5 px-4 rounded-xl shadow-md transition-colors cursor-pointer text-center"
+                      >
+                        Cadastrar Caminhão
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        setResultadoOCR(null);
+                        setVeiculoEncontrado(null);
+                        if (videoRef) iniciarCamera(ladoCamera, videoRef);
+                      }}
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-350 text-xs font-bold py-2.5 px-4 rounded-xl border border-slate-700 transition-colors cursor-pointer hover:text-white"
+                    >
+                      Ler Outra
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Controls when streaming */}
+              {streaming && !resultadoOCR && !lendoOCR && (
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    onClick={() => capturarEIdentificar(videoRef)}
+                    className="flex-1 bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold py-3 text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Tirar Foto & Identificar Placa
+                  </button>
+
+                  <div className="flex gap-2">
+                    {/* Toggle camera facing mode */}
+                    <button
+                      onClick={() => {
+                        setLadoCamera(prev => prev === 'environment' ? 'user' : 'environment');
+                      }}
+                      title="Alternar câmera frontal/traseira"
+                      className="bg-slate-800 hover:bg-slate-700 text-slate-300 p-3 rounded-xl border border-slate-700 transition-all cursor-pointer hover:text-white shrink-0"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
+                    
+                    <button
+                      onClick={() => {
+                        setAbrirScanner(false);
+                      }}
+                      className="bg-slate-850 hover:bg-slate-800 text-slate-400 text-xs font-semibold px-5 py-3 rounded-xl border border-slate-700 shrink-0 cursor-pointer"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

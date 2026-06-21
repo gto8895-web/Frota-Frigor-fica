@@ -1,9 +1,9 @@
-const CACHE_NAME = 'frigofrota-v2';
+const CACHE_NAME = 'frigofrota-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon.svg'
+  '/icon.jpg'
 ];
 
 // Install Service Worker and cache core files
