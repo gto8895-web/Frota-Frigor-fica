@@ -36,7 +36,7 @@ export default function BudgetView({
     // Filtra as manutenções pagas (não REVISÃO e custo > 0)
     const manutencoesPagasDoVeiculo = manutencoesDoVeiculo.filter(m => {
       const startsWithRevisao = m.descricao.toUpperCase().startsWith('(REVISÃO)');
-      const isRevision = m.custo === 0 || startsWithRevisao;
+      const isRevision = startsWithRevisao;
       return !isRevision;
     });
 
@@ -123,7 +123,7 @@ export default function BudgetView({
           
           let cleanDesc = m.descricao;
           const startsWithRevisao = m.descricao.toUpperCase().startsWith('(REVISÃO)');
-          const isRevision = m.custo === 0 || startsWithRevisao;
+          const isRevision = startsWithRevisao;
           
           if (startsWithRevisao) {
             cleanDesc = m.descricao.substring(9).trim();
