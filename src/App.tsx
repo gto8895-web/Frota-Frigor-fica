@@ -56,6 +56,15 @@ export default function App() {
     const day = String(today.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   });
+
+  // Data selecionada especificamente para o orçamento diário para não alterar o cabeçalho do app
+  const [dataReferenciaOrcamento, setDataReferenciaOrcamento] = useState<string>(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  });
   const [tabAtiva, setTabAtiva] = useState<'dashboard' | 'veiculos' | 'manutencoes' | 'orcamento' | 'compras' | 'backup'>('dashboard');
   const [currentTime, setCurrentTime] = useState<string>(() => {
     const now = new Date();
@@ -577,8 +586,8 @@ export default function App() {
             manutencoes={manutencoes}
             custoPadraoDiario={custoPadraoDiario}
             onUpdateCustoPadrao={setCustoPadraoDiario}
-            dataReferencia={dataReferencia}
-            onChangeDataReferencia={setDataReferencia}
+            dataReferencia={dataReferenciaOrcamento}
+            onChangeDataReferencia={setDataReferenciaOrcamento}
           />
         )}
 
