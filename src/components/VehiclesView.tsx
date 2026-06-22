@@ -91,6 +91,78 @@ export default function VehiclesView({
     setStreaming(false);
   };
 
+  const realizarLeituraAutomatica = async (videoEl: HTMLVideoElement | null) => {
+    if (!videoEl || lendoOCR || resultadoOCR || !abrirScanner || !streaming) return;
+
+    try {
+      setLendoOCR(true);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
+      
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+
+      const res = await fetch('/api/ocr-plate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ image: dataUrl })
+      });
+
+      if (!res.ok) {
+        // Silêncio para permitir nova tentativa no próximo intervalo
+        return;
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        // Silêncio para permitir nova tentativa
+        return;
+      }
+
+      const plateDetected = data.plate?.trim() || "";
+      if (plateDetected === "NOT_FOUND" || !plateDetected) {
+        // Silêncio para continuar tentando
+        return;
+      }
+
+      setResultadoOCR(plateDetected);
+
+      const normalize = (str: string) => str.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const normalizedDetected = normalize(plateDetected);
+
+      // Encontrar correspondência na lista de veículos
+      const match = veiculos.find(v => {
+        const normalizedV = normalize(v.placa);
+        return normalizedV === normalizedDetected || 
+               normalizedV.includes(normalizedDetected) || 
+               normalizedDetected.includes(normalizedV);
+      });
+
+      if (match) {
+        setVeiculoEncontrado(match);
+        setSelecaoVeiculoId(match.id);
+        setVeiculoDetalhadoId(match.id); // ABRE O CARTÃO AUTOMATICAMENTE
+        setAbrirScanner(false); // FECHA A CÂMERA
+        setResultadoOCR(null);
+        setVeiculoEncontrado(null);
+      } else {
+        setVeiculoEncontrado(null);
+      }
+
+    } catch (err) {
+      console.error("Erro no escaneamento automático silencioso:", err);
+    } finally {
+      setLendoOCR(false);
+    }
+  };
+
   const capturarEIdentificar = async (videoEl: HTMLVideoElement | null) => {
     if (!videoEl) return;
 
@@ -121,7 +193,16 @@ export default function VehiclesView({
       });
 
       if (!res.ok) {
-        throw new Error("Serviço de inteligência artificial de OCR indisponível.");
+        let errorMsg = "Serviço de inteligência artificial de OCR indisponível.";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            errorMsg = errData.error;
+          }
+        } catch (e) {
+          // fallback to default
+        }
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
@@ -152,6 +233,10 @@ export default function VehiclesView({
       if (match) {
         setVeiculoEncontrado(match);
         setSelecaoVeiculoId(match.id);
+        setVeiculoDetalhadoId(match.id); // ABRE O CARTÃO AUTOMATICAMENTE
+        setAbrirScanner(false); // FECHA A CÂMERA
+        setResultadoOCR(null);
+        setVeiculoEncontrado(null);
       } else {
         setVeiculoEncontrado(null);
       }
@@ -172,6 +257,21 @@ export default function VehiclesView({
       desativarCamera();
     };
   }, [abrirScanner, ladoCamera, videoRef]);
+
+  // Efeito de escaneamento automático a cada 2.5 segundos (estilo sensor de QR code)
+  useEffect(() => {
+    let intervalId: any;
+    if (abrirScanner && streaming && !resultadoOCR && !lendoOCR && videoRef) {
+      intervalId = setInterval(() => {
+        realizarLeituraAutomatica(videoRef);
+      }, 2500);
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [abrirScanner, streaming, resultadoOCR, lendoOCR, videoRef, veiculos]);
   
   // Controle de cadastro
   const [mostrarForm, setMostrarForm] = useState<boolean>(false);

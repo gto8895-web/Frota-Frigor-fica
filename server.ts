@@ -47,22 +47,24 @@ async function startServer() {
       
       const response = await ai.models.generateContent({
         model: "gemini-3.5-flash",
-        contents: [
-          {
-            inlineData: {
-              data: base64Data,
-              mimeType: "image/jpeg",
+        contents: {
+          parts: [
+            {
+              inlineData: {
+                data: base64Data,
+                mimeType: "image/jpeg",
+              },
             },
-          },
-          {
-            text: "Você é um classificador especializado em OCR de placas de veículos brasileiros de alta precisão. " +
-                  "Analise a imagem fornecida e extraia apenas os caracteres da placa do veículo. " +
-                  "A placa pode ser no padrão antigo brasileiro (exemplo: 'ABC-1234' ou 'ABC1234') ou no padrão Mercosul (exemplo: 'ABC1D23'). " +
-                  "Retorne como resultado APENAS a placa encontrada em letras maiúsculas, sem hífen, espaços, traços ou qualquer outro texto explicativo. " +
-                  "Exemplo de saída correta: 'ABC1D23'. " +
-                  "Se não for possível encontrar nenhuma placa legível na imagem, responda apenas 'NOT_FOUND'.",
-          },
-        ],
+            {
+              text: "Você é um classificador especializado em OCR de placas de veículos brasileiros de alta precisão. " +
+                    "Analise a imagem fornecida e extraia apenas os caracteres da placa do veículo. " +
+                    "A placa pode ser no padrão antigo brasileiro (exemplo: 'ABC-1234' ou 'ABC1234') ou no padrão Mercosul (exemplo: 'ABC1D23'). " +
+                    "Retorne como resultado APENAS a placa encontrada em letras maiúsculas, sem hífen, espaços, traços ou qualquer outro texto explicativo. " +
+                    "Exemplo de saída correta: 'ABC1D23'. " +
+                    "Se não for possível encontrar nenhuma placa legível na imagem, responda apenas 'NOT_FOUND'.",
+            }
+          ]
+        },
       });
 
       const plate = response.text?.trim() || "";

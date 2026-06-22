@@ -1,9 +1,9 @@
-const CACHE_NAME = 'frigofrota-v3';
+const CACHE_NAME = 'recuperar-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon.jpg'
+  '/icon.png'
 ];
 
 // Install Service Worker and cache core files
