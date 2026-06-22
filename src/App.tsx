@@ -73,13 +73,7 @@ export default function App() {
 
   // Estados com foco em PWA e Instalação (com suporte a iPhone 12 Pro Max e Chrome)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('frigofrota_dismiss_install') !== 'true';
-    } catch {
-      return true;
-    }
-  });
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [showIOSHintModal, setShowIOSHintModal] = useState<boolean>(false);
 
@@ -91,10 +85,7 @@ export default function App() {
       // Armazena o evento para ser disparado posteriormente via botão
       setDeferredPrompt(e);
       // Garante banner aberto
-      const dismissed = localStorage.getItem('frigofrota_dismiss_install') === 'true';
-      if (!dismissed) {
-        setShowInstallBanner(true);
-      }
+      setShowInstallBanner(true);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -137,9 +128,6 @@ export default function App() {
 
   const handleDismissInstallBanner = () => {
     setShowInstallBanner(false);
-    try {
-      localStorage.setItem('frigofrota_dismiss_install', 'true');
-    } catch (e) {}
   };
 
   // Atualizar relógio em tempo real
