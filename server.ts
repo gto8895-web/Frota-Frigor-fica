@@ -22,6 +22,11 @@ async function startServer() {
       }
       aiClient = new GoogleGenAI({
         apiKey,
+        httpOptions: {
+          headers: {
+            "User-Agent": "aistudio-build",
+          },
+        },
       });
     }
     return aiClient;
@@ -111,8 +116,10 @@ async function startServer() {
       parts.push({ text: promptText });
 
       const response = await ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: parts,
+        model: "gemini-3.5-flash",
+        contents: {
+          parts: parts
+        },
       });
 
       const plate = response.text?.trim() || "";

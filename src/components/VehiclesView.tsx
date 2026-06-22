@@ -31,6 +31,7 @@ export default function VehiclesView({
   const [streaming, setStreaming] = useState<boolean>(false);
   const [ladoCamera, setLadoCamera] = useState<'environment' | 'user'>('environment');
   const [erroCamera, setErroCamera] = useState<string | null>(null);
+  const [erroOCR, setErroOCR] = useState<string | null>(null);
   const [lendoOCR, setLendoOCR] = useState<boolean>(false);
   const [lendoAutomatico, setLendoAutomatico] = useState<boolean>(false);
   const [resultadoOCR, setResultadoOCR] = useState<string | null>(null);
@@ -48,6 +49,7 @@ export default function VehiclesView({
 
     try {
       setErroCamera(null);
+      setErroOCR(null);
       setStreaming(false);
 
       const constraints: MediaStreamConstraints = {
@@ -90,6 +92,8 @@ export default function VehiclesView({
       setStreamRef(null);
     }
     setStreaming(false);
+    setErroCamera(null);
+    setErroOCR(null);
   };
 
   const realizarLeituraAutomatica = async (videoEl: HTMLVideoElement | null) => {
@@ -193,6 +197,7 @@ export default function VehiclesView({
     try {
       setLendoOCR(true);
       setErroCamera(null);
+      setErroOCR(null);
       setResultadoOCR(null);
       setVeiculoEncontrado(null);
 
@@ -293,7 +298,7 @@ export default function VehiclesView({
 
     } catch (err: any) {
       console.error("Erro OCR:", err);
-      setErroCamera(err.message || "Erro de conexão com o servidor de IA.");
+      setErroOCR(err.message || "Erro de conexão com o servidor de IA.");
     } finally {
       setLendoOCR(false);
     }
@@ -1515,6 +1520,22 @@ export default function VehiclesView({
               {/* Controls when streaming */}
               {streaming && !resultadoOCR && !lendoOCR && (
                 <div className="flex flex-col gap-2.5">
+                  {erroOCR && (
+                    <div className="bg-rose-955/40 bg-opacity-40 bg-rose-950/40 border border-rose-500/30 text-rose-350 text-xs p-3.5 rounded-xl flex items-start gap-2.5 animate-fade-in mb-1">
+                      <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                      <div className="flex-1 text-left">
+                        <strong className="font-semibold block text-rose-450 text-[11px] uppercase tracking-wide">Erro de Escaneamento</strong>
+                        <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{erroOCR}</p>
+                      </div>
+                      <button 
+                        onClick={() => setErroOCR(null)}
+                        className="text-slate-400 hover:text-white text-xs cursor-pointer px-1 font-bold"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+
                   <div className="flex gap-2.5">
                     <button
                       onClick={() => capturarEIdentificar(videoRef)}
