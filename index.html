@@ -25,11 +25,20 @@
     <script type="module" src="/src/main.tsx"></script>
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
+        function registerSW() {
           navigator.serviceWorker.register('/sw.js')
-            .then((reg) => console.log('Service Worker registrado com sucesso: ', reg.scope))
-            .catch((err) => console.error('Falha no registro do Service Worker: ', err));
-        });
+            .then(function(reg) {
+              console.log('Service Worker registrado com sucesso: ', reg.scope);
+            })
+            .catch(function(err) {
+              console.error('Falha no registro do Service Worker: ', err);
+            });
+        }
+        if (document.readyState === 'complete' || document.readyState === 'interactive') {
+          registerSW();
+        } else {
+          window.addEventListener('load', registerSW);
+        }
       }
     </script>
   </body>
