@@ -1,9 +1,9 @@
-const CACHE_NAME = 'recuperar-v6';
+const CACHE_NAME = 'frigofrota-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/icon.png'
+  '/icon.jpg'
 ];
 
 // Install Service Worker and cache core files
@@ -56,8 +56,7 @@ self.addEventListener('fetch', (event) => {
             return cachedResponse;
           }
           // Fallback SPA index
-          const acceptHeader = event.request.headers.get('accept');
-          if (acceptHeader && acceptHeader.includes('text/html')) {
+          if (event.request.headers.get('accept').includes('text/html')) {
             return caches.match('/');
           }
         });

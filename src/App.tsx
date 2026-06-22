@@ -73,23 +73,15 @@ export default function App() {
 
   // Estados com foco em PWA e Instalação (com suporte a iPhone 12 Pro Max e Chrome)
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(true);
+  const [showInstallBanner, setShowInstallBanner] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('frigofrota_dismiss_install') !== 'true';
+    } catch {
+      return true;
+    }
+  });
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [showIOSHintModal, setShowIOSHintModal] = useState<boolean>(false);
-
-  // Forçar restauração única para limpar alterações de dados locais de hoje do usuário
-  useEffect(() => {
-    const hasReset = localStorage.getItem('ff_restore_yesterday_v2');
-    if (!hasReset) {
-      localStorage.removeItem('ff_veiculos');
-      localStorage.removeItem('ff_manutencoes');
-      localStorage.removeItem('ff_custo_diario');
-      localStorage.removeItem('frigofrota_shopping_list');
-      localStorage.removeItem('frigofrota_dismiss_install');
-      localStorage.setItem('ff_restore_yesterday_v2', 'true');
-      window.location.reload();
-    }
-  }, []);
 
   // Detectar suporte à instalação no Chrome e se é dispositivo iOS (iPhone / iPad)
   useEffect(() => {
@@ -99,7 +91,10 @@ export default function App() {
       // Armazena o evento para ser disparado posteriormente via botão
       setDeferredPrompt(e);
       // Garante banner aberto
-      setShowInstallBanner(true);
+      const dismissed = localStorage.getItem('frigofrota_dismiss_install') === 'true';
+      if (!dismissed) {
+        setShowInstallBanner(true);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -123,30 +118,21 @@ export default function App() {
   }, []);
 
   const handleInstallPWA = async () => {
-    if (deferredPrompt) {
-      try {
-        await deferredPrompt.prompt();
-        const { outcome } = await deferredPrompt.userChoice;
-        console.log('Resultado do prompt de instalação do usuário:', outcome);
-        if (outcome === 'accepted') {
-          setDeferredPrompt(null);
-          setShowInstallBanner(false);
-        }
-      } catch (err) {
-        console.error("Erro no prompt nativo de instalação:", err);
-      }
-    } else {
-      alert("Instalação do Aplicativo:\n\n" +
-            "Se o prompt de confirmação automática ou o menu '3 pontos (⋮) > Instalar' não aparecerem, verifique estes motivos:\n\n" +
-            "1. JÁ ESTÁ INSTALADO: O Chrome esconde completamente a opção de instalação se o aplicativo 'Recuperar' já tiver sido adicionado à sua tela inicial anteriormente. Procure pelo ícone azul 'Recuperar' entre seus aplicativos ou reinicie o celular.\n" +
-            "2. IFRAME DO AMBIENTE DEV: O navegador bloqueia PWA se você visualizar o app de dentro do painel do AI Studio. Abra o aplicativo diretamente pelo seu link de acesso:\n" +
-            "   https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app\n" +
-            "3. GOOGLE CHROME OFICIAL: Certifique-se de usar o aplicativo oficial do Chrome para Android. Telas de navegadores internas (como aba do WhatsApp, Gmail ou Instagram) não possuem suporte a PWA.");
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log('Resultado do prompt de instalação do usuário:', outcome);
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
     }
   };
 
   const handleDismissInstallBanner = () => {
     setShowInstallBanner(false);
+    try {
+      localStorage.setItem('frigofrota_dismiss_install', 'true');
+    } catch (e) {}
   };
 
   // Atualizar relógio em tempo real
@@ -359,7 +345,7 @@ export default function App() {
               </div>
               <div>
                 <span className="font-display font-black text-sky-400 text-base tracking-tight block">
-                  RECUPERAR
+                  FRIGO-FROTA
                 </span>
               </div>
             </div>
@@ -443,27 +429,35 @@ export default function App() {
               </div>
               <div>
                 <h4 className="font-display font-semibold text-white text-sm">Rodar como Aplicativo Nativo (PWA)</h4>
-                <p className="text-xs text-slate-400 mt-0.5">Disponibilize o Recuperar na tela inicial para acesso instantâneo nos seus trajetos.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Disponibilize o FrigoFrota na tela inicial para acesso instantâneo nos seus trajetos.</p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-              <button
-                onClick={handleInstallPWA}
-                className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
-              >
-                <Download className="w-3.5 h-3.5" /> Instalar no Android
-              </button>
-              
-              <button
-                onClick={() => setShowIOSHintModal(true)}
-                className="bg-[#1e293b]/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-              >
-                <Smartphone className="w-3.5 h-3.5 text-sky-450" /> Instalar no iPhone
-              </button>
-
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              {deferredPrompt ? (
+                <button
+                  onClick={handleInstallPWA}
+                  className="w-full sm:w-auto bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                >
+                  <Download className="w-3.5 h-3.5" /> Instalar Aplicativo
+                </button>
+              ) : isIOS ? (
+                <button
+                  onClick={() => setShowIOSHintModal(true)}
+                  className="w-full sm:w-auto bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                >
+                  <Smartphone className="w-3.5 h-3.5" /> Instalar no iPhone
+                </button>
+              ) : (
+                <button
+                  onClick={() => setShowIOSHintModal(true)}
+                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
+                >
+                  <Info className="w-3.5 h-3.5 text-sky-400" /> Como Instalar
+                </button>
+              )}
               <button
                 onClick={handleDismissInstallBanner}
-                className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0 ml-1"
+                className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0"
                 title="Dispensar sugestão"
               >
                 <X className="w-4 h-4" />
@@ -496,7 +490,7 @@ export default function App() {
               {/* Conteúdo das Instruções */}
               <div className="space-y-4">
                 <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  Para rodar o <span className="text-sky-400 font-semibold">Recuperar</span> como um aplicativo móvel nativo em aparelhos iOS (ou no Google Chrome do seu <span className="text-white font-semibold">iPhone 12 Pro Max</span>), siga as instruções rápidas:
+                  Para rodar o <span className="text-sky-400 font-semibold">FrigoFrota</span> como um aplicativo móvel nativo em aparelhos iOS (ou no Google Chrome do seu <span className="text-white font-semibold">iPhone 12 Pro Max</span>), siga as instruções rápidas:
                 </p>
 
                 {/* No Chrome / Safari no iOS */}
@@ -515,7 +509,7 @@ export default function App() {
                       Role a lista para baixo e toque em <strong>"Adicionar à Tela de Início"</strong>.
                     </li>
                     <li>
-                      Defina o título como <strong>"Recuperar"</strong> e toque em <strong>"Adicionar"</strong> no canto superior direito.
+                      Defina o título como <strong>"FrigoFrota"</strong> e toque em <strong>"Adicionar"</strong> no canto superior direito.
                     </li>
                   </ol>
                 </div>
@@ -545,8 +539,6 @@ export default function App() {
             </div>
           </div>
         )}
-
-
 
         {tabAtiva === 'dashboard' && (
           <DashboardView

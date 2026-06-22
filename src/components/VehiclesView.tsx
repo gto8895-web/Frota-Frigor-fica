@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Veiculo, StatusVeiculo, StatusRefrigeracao, Manutencao, Avaria } from '../types';
-import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight, Camera, RefreshCw, VideoOff, Check, Upload } from 'lucide-react';
+import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight, Camera, RefreshCw, VideoOff, Check } from 'lucide-react';
 
 interface VehiclesViewProps {
   veiculos: Veiculo[];
@@ -31,9 +31,7 @@ export default function VehiclesView({
   const [streaming, setStreaming] = useState<boolean>(false);
   const [ladoCamera, setLadoCamera] = useState<'environment' | 'user'>('environment');
   const [erroCamera, setErroCamera] = useState<string | null>(null);
-  const [erroOCR, setErroOCR] = useState<string | null>(null);
   const [lendoOCR, setLendoOCR] = useState<boolean>(false);
-  const [lendoAutomatico, setLendoAutomatico] = useState<boolean>(false);
   const [resultadoOCR, setResultadoOCR] = useState<string | null>(null);
   const [veiculoEncontrado, setVeiculoEncontrado] = useState<Veiculo | null>(null);
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
@@ -49,7 +47,6 @@ export default function VehiclesView({
 
     try {
       setErroCamera(null);
-      setErroOCR(null);
       setStreaming(false);
 
       const constraints: MediaStreamConstraints = {
@@ -92,207 +89,39 @@ export default function VehiclesView({
       setStreamRef(null);
     }
     setStreaming(false);
-    setErroCamera(null);
-    setErroOCR(null);
-  };
-
-  const realizarLeituraAutomatica = async (videoEl: HTMLVideoElement | null) => {
-    if (!videoEl || lendoOCR || lendoAutomatico || resultadoOCR || !abrirScanner || !streaming) return;
-    if (videoEl.videoWidth === 0 || videoEl.videoHeight === 0) return;
-
-    try {
-      setLendoAutomatico(true);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = videoEl.videoWidth;
-      canvas.height = videoEl.videoHeight;
-      
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-
-      // Desenhar o frame cheio
-      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-
-      // Gerar também um recorte de alta definição da zona central de foco
-      let croppedDataUrl = "";
-      try {
-        const cropCanvas = document.createElement('canvas');
-        const cW = Math.round(canvas.width * 0.70);
-        const cH = Math.round(canvas.height * 0.40);
-        cropCanvas.width = cW;
-        cropCanvas.height = cH;
-        const cropCtx = cropCanvas.getContext('2d');
-        if (cropCtx) {
-          const sX = Math.round(canvas.width * 0.15);
-          const sY = Math.round(canvas.height * 0.30);
-          cropCtx.drawImage(videoEl, sX, sY, cW, cH, 0, 0, cW, cH);
-          croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.90);
-        }
-      } catch (err) {
-        console.warn("Falha ao gerar recorte de foco:", err);
-      }
-
-      const placasCadastradas = veiculos.map(v => v.placa);
-
-      // Se o cliente estiver rodando sob outra hospedagem estática (ex: Vercel),
-      // direcionamos a requisição de OCR para o servidor ativo que contém as chaves de API
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isCloudRun = window.location.hostname.includes('run.app');
-      const apiHost = (isLocal || isCloudRun) ? '' : 'https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app';
-
-      const res = await fetch(`${apiHost}/api/ocr-plate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ 
-          image: dataUrl,
-          croppedImage: croppedDataUrl || undefined,
-          registeredPlates: placasCadastradas
-        })
-      });
-
-      if (!res.ok) {
-        return;
-      }
-
-      const data = await res.json();
-      if (!data.success) {
-        return;
-      }
-
-      const plateDetected = data.plate?.trim() || "";
-      if (plateDetected === "NOT_FOUND" || !plateDetected) {
-        return;
-      }
-
-      const normalize = (str: string) => str.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const normalizedDetected = normalize(plateDetected);
-
-      // Encontrar correspondência na lista de veículos
-      const match = veiculos.find(v => {
-        const normalizedV = normalize(v.placa);
-        return normalizedV === normalizedDetected || 
-               normalizedV.includes(normalizedDetected) || 
-               normalizedDetected.includes(normalizedV);
-      });
-
-      if (match) {
-        setVeiculoEncontrado(match);
-        setSelecaoVeiculoId(match.id);
-        setVeiculoDetalhadoId(match.id); // ABRE O CARTÃO AUTOMATICAMENTE
-        setAbrirScanner(false); // FECHA A CÂMERA
-        setResultadoOCR(null);
-        setVeiculoEncontrado(null);
-      }
-    } catch (err) {
-      console.error("Erro no escaneamento automático silencioso:", err);
-    } finally {
-      setLendoAutomatico(false);
-    }
   };
 
   const capturarEIdentificar = async (videoEl: HTMLVideoElement | null) => {
     if (!videoEl) return;
-    if (videoEl.videoWidth === 0 || videoEl.videoHeight === 0) {
-      setErroCamera("A câmera ainda está carregando os frames iniciais. Tente novamente em 1 segundo.");
-      return;
-    }
 
     try {
       setLendoOCR(true);
       setErroCamera(null);
-      setErroOCR(null);
       setResultadoOCR(null);
       setVeiculoEncontrado(null);
 
-      // Limitar o tamanho da imagem capturada para evitar payloads gigantescos no 3G/4G/5G
-      const rawWidth = videoEl.videoWidth;
-      const rawHeight = videoEl.videoHeight;
-      const MAX_DIM = 1200;
-      let targetWidth = rawWidth;
-      let targetHeight = rawHeight;
-      
-      if (rawWidth > MAX_DIM || rawHeight > MAX_DIM) {
-        if (rawWidth > rawHeight) {
-          targetHeight = Math.round((rawHeight * MAX_DIM) / rawWidth);
-          targetWidth = MAX_DIM;
-        } else {
-          targetWidth = Math.round((rawWidth * MAX_DIM) / rawHeight);
-          targetHeight = MAX_DIM;
-        }
-      }
-
       const canvas = document.createElement('canvas');
-      canvas.width = targetWidth;
-      canvas.height = targetHeight;
+      canvas.width = videoEl.videoWidth || 640;
+      canvas.height = videoEl.videoHeight || 480;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) {
-        throw new Error("Não foi possível processar os pixels da imagem.");
+        throw new Error("Não foi possível processar a imagem.");
       }
 
-      // Desenhar frame original redimensionado
-      ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
+      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
-      // Desenhar recorte ampliado do centro
-      let croppedDataUrl = "";
-      try {
-        const cropCanvas = document.createElement('canvas');
-        const cW = Math.round(targetWidth * 0.70);
-        const cH = Math.round(targetHeight * 0.40);
-        cropCanvas.width = cW;
-        cropCanvas.height = cH;
-        const cropCtx = cropCanvas.getContext('2d');
-        if (cropCtx) {
-          const sX = Math.round(targetWidth * 0.15);
-          const sY = Math.round(targetHeight * 0.30);
-          cropCtx.drawImage(canvas, sX, sY, cW, cH, 0, 0, cW, cH);
-          croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.85);
-        }
-      } catch (cropErr) {
-        console.warn("Falha no recorte manual:", cropErr);
-      }
-
-      const placasCadastradas = veiculos.map(v => v.placa);
-
-      // Se o cliente estiver rodando sob outra hospedagem estática (ex: Vercel),
-      // direcionamos a requisição de OCR para o servidor ativo que contém as chaves de API
-      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-      const isCloudRun = window.location.hostname.includes('run.app');
-      const apiHost = (isLocal || isCloudRun) ? '' : 'https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app';
-
-      const res = await fetch(`${apiHost}/api/ocr-plate`, {
+      const res = await fetch('/api/ocr-plate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ 
-          image: dataUrl,
-          croppedImage: croppedDataUrl || undefined,
-          registeredPlates: placasCadastradas
-        })
+        body: JSON.stringify({ image: dataUrl })
       });
 
       if (!res.ok) {
-        let errorMsg = "Serviço de inteligência artificial de OCR indisponível.";
-        if (res.status === 413) {
-          errorMsg = "A imagem capturada é pesada demais para os servidores de IA.";
-        } else {
-          try {
-            const errData = await res.json();
-            if (errData && errData.error) {
-              errorMsg = errData.error;
-            } else {
-              errorMsg = `Serviço de IA de OCR indisponível (Erro HTTP: ${res.status}).`;
-            }
-          } catch (e) {
-            errorMsg = `Serviço de IA de OCR indisponível (Erro HTTP: ${res.status}).`;
-          }
-        }
-        throw new Error(errorMsg);
+        throw new Error("Serviço de inteligência artificial de OCR indisponível.");
       }
 
       const data = await res.json();
@@ -302,7 +131,7 @@ export default function VehiclesView({
 
       const plateDetected = data.plate?.trim() || "";
       if (plateDetected === "NOT_FOUND" || !plateDetected) {
-        setResultadoOCR("Nenhuma placa de veículo identificada. Tente com outro ângulo ou envie uma foto nítida.");
+        setResultadoOCR("Nenhuma placa de veículo identificada. Tente com outro ângulo.");
         setLendoOCR(false);
         return;
       }
@@ -323,17 +152,13 @@ export default function VehiclesView({
       if (match) {
         setVeiculoEncontrado(match);
         setSelecaoVeiculoId(match.id);
-        setVeiculoDetalhadoId(match.id); // ABRE O CARTÃO AUTOMATICAMENTE
-        setAbrirScanner(false); // FECHA A CÂMERA
-        setResultadoOCR(null);
-        setVeiculoEncontrado(null);
       } else {
         setVeiculoEncontrado(null);
       }
 
     } catch (err: any) {
       console.error("Erro OCR:", err);
-      setErroOCR(err.message || "Erro de conexão com o servidor de IA.");
+      setErroCamera(err.message || "Erro de conexão com o servidor de IA.");
     } finally {
       setLendoOCR(false);
     }
@@ -347,21 +172,6 @@ export default function VehiclesView({
       desativarCamera();
     };
   }, [abrirScanner, ladoCamera, videoRef]);
-
-  // Efeito de escaneamento automático a cada 2.0 segundos (estilo sensor de QR code)
-  useEffect(() => {
-    let intervalId: any;
-    if (abrirScanner && streaming && !resultadoOCR && !lendoOCR && !lendoAutomatico && videoRef) {
-      intervalId = setInterval(() => {
-        realizarLeituraAutomatica(videoRef);
-      }, 2000);
-    }
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [abrirScanner, streaming, resultadoOCR, lendoOCR, lendoAutomatico, videoRef, veiculos]);
   
   // Controle de cadastro
   const [mostrarForm, setMostrarForm] = useState<boolean>(false);
@@ -1417,31 +1227,21 @@ export default function VehiclesView({
                 />
               )}
 
-              {/* Scanning Active HUD status */}
-              {streaming && !resultadoOCR && (
-                <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-[#0d1527]/90 border border-slate-750/80 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg">
-                  <div className={`w-2 h-2 rounded-full ${lendoAutomatico ? 'bg-emerald-500 animate-ping' : 'bg-sky-500 animate-pulse'}`} />
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-slate-100 font-mono">
-                    {lendoAutomatico ? 'IA Analisando Imagem...' : 'Auto-Scanner de Placas'}
-                  </span>
-                </div>
-              )}
-
               {/* Scanning Laser Line Overlay */}
               {streaming && !lendoOCR && !resultadoOCR && (
-                <div className="absolute inset-x-0 h-1 bg-emerald-500/80 shadow-[0_0_12px_#10b981] animate-bounce z-10 pointer-events-none" style={{ top: '45%' }} />
+                <div className="absolute inset-x-0 h-1 bg-emerald-500/80 shadow-[0_0_12px_#10b981] animate-bounce z-10 pointer-events-none" style={{ top: '40%' }} />
               )}
 
               {/* Target bracket outline */}
               {streaming && !resultadoOCR && !lendoOCR && (
-                <div className="absolute border-2 border-dashed border-sky-455/40 border-sky-400/40 rounded-xl w-[75%] h-[40%] max-w-[450px] pointer-events-none flex items-center justify-center animate-pulse">
+                <div className="absolute border-2 border-dashed border-sky-400/40 rounded-xl w-[75%] h-[35%] max-w-[450px] pointer-events-none flex items-center justify-center animate-pulse">
                   <div className="text-sky-300 text-[10px] font-mono tracking-wider bg-slate-950/80 px-2 py-1 rounded border border-sky-500/20 uppercase">
                     Centralize a Placa Aqui
                   </div>
                 </div>
               )}
 
-              {/* Loading spinner over the camera for manual click */}
+              {/* Loading spinner over the camera */}
               {lendoOCR && (
                 <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center gap-3 z-20">
                   <div className="w-10 h-10 border-4 border-sky-400 border-t-transparent rounded-full animate-spin" />
@@ -1454,23 +1254,23 @@ export default function VehiclesView({
 
               {/* Camera access error message */}
               {erroCamera && (
-                <div className="absolute inset-0 bg-[#020617] p-6 flex flex-col items-center justify-center text-center gap-4">
+                <div className="absolute inset-0 bg-[#020617] p-6 flex flex-col items-center justify-center text-center gap-3">
                   <VideoOff className="w-10 h-10 text-rose-500" />
                   <p className="text-xs text-rose-450 font-semibold max-w-sm">{erroCamera}</p>
                   <button
                     onClick={() => iniciarCamera(ladoCamera, videoRef)}
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-5 py-3 rounded-xl border border-slate-700 cursor-pointer shadow-md"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold px-4 py-2 rounded-lg border border-slate-700 cursor-pointer"
                   >
-                    Tentar Câmera Novamente
+                    Tentar Novamente
                   </button>
                 </div>
               )}
 
               {/* No stream state */}
               {!streaming && !erroCamera && !lendoOCR && (
-                <div className="text-slate-500 text-xs flex flex-col items-center gap-3 text-center">
+                <div className="text-slate-500 text-xs flex flex-col items-center gap-2">
                   <div className="w-6 h-6 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-                  <span className="font-mono">Carregando lente da câmera...</span>
+                  Carregando lente da câmera...
                 </div>
               )}
             </div>
@@ -1488,11 +1288,11 @@ export default function VehiclesView({
                       </strong>
                     </div>
                     {veiculoEncontrado ? (
-                      <span className="bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase font-sans">
+                      <span className="bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase">
                         <Check className="w-3.5 h-3.5" /> Encontrado
                       </span>
                     ) : (
-                      <span className="bg-amber-950/50 border border-amber-500/30 text-amber-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase font-sans">
+                      <span className="bg-amber-950/50 border border-amber-500/30 text-amber-400 text-xxs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 font-mono uppercase">
                         <AlertTriangle className="w-3.5 h-3.5" /> Frota Ausente
                       </span>
                     )}
@@ -1515,7 +1315,7 @@ export default function VehiclesView({
 
                   <div className="flex items-center gap-2 pt-1 border-t border-slate-800/50">
                     {veiculoEncontrado ? (
-                       <button
+                      <button
                         onClick={() => {
                           setAbrirScanner(false);
                           setResultadoOCR(null);
@@ -1554,34 +1354,16 @@ export default function VehiclesView({
 
               {/* Controls when streaming */}
               {streaming && !resultadoOCR && !lendoOCR && (
-                <div className="flex flex-col gap-2.5">
-                  {erroOCR && (
-                    <div className="bg-rose-955/40 bg-opacity-40 bg-rose-950/40 border border-rose-500/30 text-rose-350 text-xs p-3.5 rounded-xl flex items-start gap-2.5 animate-fade-in mb-1">
-                      <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                      <div className="flex-1 text-left">
-                        <strong className="font-semibold block text-rose-450 text-[11px] uppercase tracking-wide">Erro de Escaneamento</strong>
-                        <p className="text-[11px] text-slate-300 mt-0.5 leading-relaxed">{erroOCR}</p>
-                      </div>
-                      <button 
-                        onClick={() => setErroOCR(null)}
-                        className="text-slate-400 hover:text-white text-xs cursor-pointer px-1 font-bold"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )}
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    onClick={() => capturarEIdentificar(videoRef)}
+                    className="flex-1 bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold py-3 text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
+                  >
+                    <Camera className="w-4 h-4" />
+                    Tirar Foto & Identificar Placa
+                  </button>
 
-                  <div className="flex gap-2.5">
-                    <button
-                      onClick={() => capturarEIdentificar(videoRef)}
-                      className="flex-1 bg-sky-400 hover:bg-sky-300 text-slate-950 font-bold py-3 text-xs rounded-xl flex items-center justify-center gap-2 shadow-lg transition-all cursor-pointer"
-                    >
-                      <Camera className="w-4 h-4" />
-                      Tirar Foto & Identificar Placa
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2 justify-end">
+                  <div className="flex gap-2">
                     {/* Toggle camera facing mode */}
                     <button
                       onClick={() => {
@@ -1605,6 +1387,7 @@ export default function VehiclesView({
                 </div>
               )}
             </div>
+
           </div>
         </div>
       )}
