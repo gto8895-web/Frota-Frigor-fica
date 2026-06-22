@@ -252,7 +252,13 @@ export default function VehiclesView({
 
       const placasCadastradas = veiculos.map(v => v.placa);
 
-      const res = await fetch('/api/ocr-plate', {
+      // Se o cliente estiver rodando sob outra hospedagem estática (ex: Vercel),
+      // direcionamos a requisição de OCR para o servidor ativo que contém as chaves de API
+      const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const isCloudRun = window.location.hostname.includes('run.app');
+      const apiHost = (isLocal || isCloudRun) ? '' : 'https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app';
+
+      const res = await fetch(`${apiHost}/api/ocr-plate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

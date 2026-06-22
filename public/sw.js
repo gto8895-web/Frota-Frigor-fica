@@ -56,7 +56,8 @@ self.addEventListener('fetch', (event) => {
             return cachedResponse;
           }
           // Fallback SPA index
-          if (event.request.headers.get('accept').includes('text/html')) {
+          const acceptHeader = event.request.headers.get('accept');
+          if (acceptHeader && acceptHeader.includes('text/html')) {
             return caches.match('/');
           }
         });

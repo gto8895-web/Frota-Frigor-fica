@@ -130,6 +130,8 @@ export default function App() {
       } catch (err) {
         console.error("Erro no prompt nativo de instalação:", err);
       }
+    } else {
+      alert("Instalação Nativa: O seu navegador Android está processando a instalação PWA. Se a tela de confirmação automática não abrir em instantes, você pode instalar instantaneamente tocando nos 3 pontos (⋮) no canto superior de seu navegador e selecionando 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
     }
   };
 
@@ -438,14 +440,12 @@ export default function App() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-              {deferredPrompt && (
-                <button
-                  onClick={handleInstallPWA}
-                  className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
-                >
-                  <Download className="w-3.5 h-3.5" /> Instalar no Android
-                </button>
-              )}
+              <button
+                onClick={handleInstallPWA}
+                className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
+              >
+                <Download className="w-3.5 h-3.5" /> Instalar no Android
+              </button>
               
               <button
                 onClick={() => setShowIOSHintModal(true)}
