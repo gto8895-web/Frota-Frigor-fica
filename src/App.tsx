@@ -82,6 +82,7 @@ export default function App() {
   });
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [showIOSHintModal, setShowIOSHintModal] = useState<boolean>(false);
+  const [showAndroidHintModal, setShowAndroidHintModal] = useState<boolean>(false);
 
   // Detectar suporte à instalação no Chrome e se é dispositivo iOS (iPhone / iPad)
   useEffect(() => {
@@ -118,13 +119,21 @@ export default function App() {
   }, []);
 
   const handleInstallPWA = async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    const { outcome } = await deferredPrompt.userChoice;
-    console.log('Resultado do prompt de instalação do usuário:', outcome);
-    if (outcome === 'accepted') {
-      setDeferredPrompt(null);
-      setShowInstallBanner(false);
+    if (deferredPrompt) {
+      try {
+        await deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        console.log('Resultado do prompt de instalação do usuário:', outcome);
+        if (outcome === 'accepted') {
+          setDeferredPrompt(null);
+          setShowInstallBanner(false);
+        }
+      } catch (err) {
+        console.error("Erro no prompt nativo de instalação:", err);
+        setShowAndroidHintModal(true);
+      }
+    } else {
+      setShowAndroidHintModal(true);
     }
   };
 
@@ -433,14 +442,12 @@ export default function App() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
-              {deferredPrompt && (
-                <button
-                  onClick={handleInstallPWA}
-                  className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
-                >
-                  <Download className="w-3.5 h-3.5" /> Instalar no Android
-                </button>
-              )}
+              <button
+                onClick={handleInstallPWA}
+                className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
+              >
+                <Download className="w-3.5 h-3.5" /> Instalar no Android
+              </button>
               
               <button
                 onClick={() => setShowIOSHintModal(true)}
@@ -523,6 +530,67 @@ export default function App() {
                   <button
                     type="button"
                     onClick={() => setShowIOSHintModal(false)}
+                    className="mt-1.5 bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-6 py-2 rounded-xl text-xs cursor-pointer shadow-md inline-flex items-center gap-1.5"
+                  >
+                    Entendi, obrigado!
+                  </button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* Modal de Instruções de Instalação para Android */}
+        {showAndroidHintModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#020617]/85 backdrop-blur-xs animate-fade-in">
+            <div className="bg-[#1e293b] border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl relative overflow-hidden text-slate-100">
+              <button
+                onClick={() => setShowAndroidHintModal(false)}
+                className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white hover:bg-[#020617] rounded-xl transition-all cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              <div className="flex items-center gap-3 border-b border-slate-800 pb-4 mb-5">
+                <div className="p-2 bg-sky-500/10 border border-sky-500/25 text-sky-400 rounded-xl">
+                  <Smartphone className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-bold text-white leading-tight">Instalar Recuperar no Android</h3>
+                  <p className="text-[10px] text-sky-400 mt-0.5 font-medium">Aplicativo Nativo Muito Mais Rápido</p>
+                </div>
+              </div>
+
+              {/* Conteúdo das Instruções Android */}
+              <div className="space-y-4">
+                <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                  Para rodar o <span className="text-sky-400 font-semibold">Recuperar</span> como um aplicativo móvel direto da tela inicial do seu celular Android, siga os passos rápidos abaixo:
+                </p>
+
+                {/* No Chrome / Samsung Internet no Android */}
+                <div className="bg-[#020617]/60 border border-slate-800 rounded-2xl p-4 space-y-3 font-sans text-xs">
+                  <h4 className="font-bold text-sky-450 uppercase tracking-wider text-[10px] flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 bg-sky-400 rounded-full animate-pulse"></span> No Google Chrome ou Samsung Internet
+                  </h4>
+                  <ol className="space-y-2.5 text-slate-200 pl-4 list-decimal leading-relaxed">
+                    <li>
+                      Toque no ícone de <strong>três pontos (<span className="text-sky-450 font-bold">⋮</span>)</strong> no canto superior direito do navegador.
+                    </li>
+                    <li>
+                      Selecione a opção <strong className="text-white">"Instalar aplicativo"</strong> ou <strong className="text-white">"Adicionar à tela inicial"</strong>.
+                    </li>
+                    <li>
+                      Confirme com um toque em <strong className="text-sky-400">"Instalar"</strong> para concluir a instalação nativa.
+                    </li>
+                  </ol>
+                </div>
+
+                <div className="text-center pt-3 border-t border-slate-800/60 flex flex-col items-center gap-1.5">
+                  <p className="text-[10px] text-slate-500 font-mono">Assim, você terá acesso imediato e controle total da frota frigorífica direto do seu Android!</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAndroidHintModal(false)}
                     className="mt-1.5 bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-6 py-2 rounded-xl text-xs cursor-pointer shadow-md inline-flex items-center gap-1.5"
                   >
                     Entendi, obrigado!
