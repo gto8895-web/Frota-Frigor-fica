@@ -122,7 +122,12 @@ export default function App() {
         console.error("Erro no prompt nativo de instalação:", err);
       }
     } else {
-      alert("Instalação Nativa: O seu navegador Android está processando a instalação PWA. Se a tela de confirmação automática não abrir em instantes, você pode instalar instantaneamente tocando nos 3 pontos (⋮) no canto superior de seu navegador e selecionando 'Instalar aplicativo' ou 'Adicionar à tela inicial'.");
+      alert("Instalação do Aplicativo:\n\n" +
+            "Se o prompt de confirmação automática ou o menu '3 pontos (⋮) > Instalar' não aparecerem, verifique estes motivos:\n\n" +
+            "1. JÁ ESTÁ INSTALADO: O Chrome esconde completamente a opção de instalação se o aplicativo 'Recuperar' já tiver sido adicionado à sua tela inicial anteriormente. Procure pelo ícone azul 'Recuperar' entre seus aplicativos ou reinicie o celular.\n" +
+            "2. IFRAME DO AMBIENTE DEV: O navegador bloqueia PWA se você visualizar o app de dentro do painel do AI Studio. Abra o aplicativo diretamente pelo seu link de acesso:\n" +
+            "   https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app\n" +
+            "3. GOOGLE CHROME OFICIAL: Certifique-se de usar o aplicativo oficial do Chrome para Android. Telas de navegadores internas (como aba do WhatsApp, Gmail ou Instagram) não possuem suporte a PWA.");
     }
   };
 
