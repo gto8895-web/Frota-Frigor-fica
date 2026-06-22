@@ -121,7 +121,14 @@ export default function VehiclesView({
       });
 
       if (!res.ok) {
-        throw new Error("Serviço de inteligência artificial de OCR indisponível.");
+        let errMsg = "Serviço de inteligência artificial de OCR indisponível.";
+        try {
+          const errData = await res.json();
+          if (errData && errData.error) {
+            errMsg = `${errMsg} (Detalhes: ${errData.error})`;
+          }
+        } catch (_) {}
+        throw new Error(errMsg);
       }
 
       const data = await res.json();
