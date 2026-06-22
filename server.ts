@@ -13,6 +13,17 @@ async function startServer() {
   // Set body parser limits to support larger base64 images
   app.use(express.json({ limit: "15mb" }));
 
+  // Allow CORS requests (such as from Vercel deployments)
+  app.use((req, res, next) => {
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS, PUT, PATCH, DELETE");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") {
+      return res.status(200).end();
+    }
+    next();
+  });
+
   let aiClient: GoogleGenAI | null = null;
   function getAiClient() {
     if (!aiClient) {

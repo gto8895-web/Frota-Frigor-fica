@@ -100,27 +100,65 @@ export default function VehiclesView({
       setResultadoOCR(null);
       setVeiculoEncontrado(null);
 
+      // Redimensionar para evitar tamanhos de dados enormes com câmeras HD/4K de celulares
+      let width = videoEl.videoWidth || 640;
+      let height = videoEl.videoHeight || 480;
+      const maxDimension = 800; // 800px é perfeito para o Gemini reconhecer caracteres rapidamente
+      if (width > maxDimension || height > maxDimension) {
+        if (width > height) {
+          height = Math.round((height * maxDimension) / width);
+          width = maxDimension;
+        } else {
+          width = Math.round((width * maxDimension) / height);
+          height = maxDimension;
+        }
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = videoEl.videoWidth || 640;
-      canvas.height = videoEl.videoHeight || 480;
+      canvas.width = width;
+      canvas.height = height;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error("Não foi possível processar a imagem.");
       }
 
-      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      ctx.drawImage(videoEl, 0, 0, width, height);
+      // Compactar a qualidade da imagem para 0.80. Reduz drasticamente o tamanho do payload.
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
 
-      const res = await fetch('/api/ocr-plate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ image: dataUrl })
-      });
+      // Tentar a rota relativa primeiro (para ambientes onde o backend está rodando no mesmo host)
+      let res: Response | null = null;
+      try {
+        res = await fetch('/api/ocr-plate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ image: dataUrl })
+        });
+      } catch (err: any) {
+        console.warn("Erro ao contactar rota local, tentando fallback...", err);
+      }
 
-      if (!res.ok) {
+      // Se falhar a rota relativa (ex: no Vercel que hospeda apenas arquivos estáticos)
+      // usamos o fallback do servidor ativo Cloud Run
+      if (!res || !res.ok) {
+        const fallbackUrl = "https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app/api/ocr-plate";
+        try {
+          res = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ image: dataUrl })
+          });
+        } catch (err: any) {
+          throw new Error("Serviço de inteligência artificial de OCR indisponível. Erro de rede ou indisponibilidade do servidor backend.");
+        }
+      }
+
+      if (!res || !res.ok) {
         let errMsg = "Serviço de inteligência artificial de OCR indisponível.";
         try {
           const errData = await res.json();
