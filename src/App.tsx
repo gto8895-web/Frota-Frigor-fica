@@ -432,32 +432,26 @@ export default function App() {
                 <p className="text-xs text-slate-400 mt-0.5">Disponibilize o Recuperar na tela inicial para acesso instantâneo nos seus trajetos.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-              {deferredPrompt ? (
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
+              {deferredPrompt && (
                 <button
                   onClick={handleInstallPWA}
-                  className="w-full sm:w-auto bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
+                  className="bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md hover:scale-[1.02]"
                 >
-                  <Download className="w-3.5 h-3.5" /> Instalar Aplicativo
-                </button>
-              ) : isIOS ? (
-                <button
-                  onClick={() => setShowIOSHintModal(true)}
-                  className="w-full sm:w-auto bg-sky-400 hover:bg-sky-350 text-slate-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-md"
-                >
-                  <Smartphone className="w-3.5 h-3.5" /> Instalar no iPhone
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowIOSHintModal(true)}
-                  className="w-full sm:w-auto bg-slate-800 hover:bg-slate-700/80 border border-slate-700 text-slate-200 px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-                >
-                  <Info className="w-3.5 h-3.5 text-sky-400" /> Como Instalar
+                  <Download className="w-3.5 h-3.5" /> Instalar no Android
                 </button>
               )}
+              
+              <button
+                onClick={() => setShowIOSHintModal(true)}
+                className="bg-[#1e293b]/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white px-4 py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Smartphone className="w-3.5 h-3.5 text-sky-450" /> Instalar no iPhone
+              </button>
+
               <button
                 onClick={handleDismissInstallBanner}
-                className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0"
+                className="p-2 text-slate-500 hover:text-slate-300 hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0 ml-1"
                 title="Dispensar sugestão"
               >
                 <X className="w-4 h-4" />

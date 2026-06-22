@@ -201,33 +201,50 @@ export default function VehiclesView({
       setResultadoOCR(null);
       setVeiculoEncontrado(null);
 
+      // Limitar o tamanho da imagem capturada para evitar payloads gigantescos no 3G/4G/5G
+      const rawWidth = videoEl.videoWidth;
+      const rawHeight = videoEl.videoHeight;
+      const MAX_DIM = 1200;
+      let targetWidth = rawWidth;
+      let targetHeight = rawHeight;
+      
+      if (rawWidth > MAX_DIM || rawHeight > MAX_DIM) {
+        if (rawWidth > rawHeight) {
+          targetHeight = Math.round((rawHeight * MAX_DIM) / rawWidth);
+          targetWidth = MAX_DIM;
+        } else {
+          targetWidth = Math.round((rawWidth * MAX_DIM) / rawHeight);
+          targetHeight = MAX_DIM;
+        }
+      }
+
       const canvas = document.createElement('canvas');
-      canvas.width = videoEl.videoWidth;
-      canvas.height = videoEl.videoHeight;
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error("Não foi possível processar os pixels da imagem.");
       }
 
-      // Desenhar frame original
-      ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+      // Desenhar frame original redimensionado
+      ctx.drawImage(videoEl, 0, 0, targetWidth, targetHeight);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
-      // Desenhar recorte ampliado do centro (para focar na placa centralizada)
+      // Desenhar recorte ampliado do centro
       let croppedDataUrl = "";
       try {
         const cropCanvas = document.createElement('canvas');
-        const cW = Math.round(canvas.width * 0.70);
-        const cH = Math.round(canvas.height * 0.40);
+        const cW = Math.round(targetWidth * 0.70);
+        const cH = Math.round(targetHeight * 0.40);
         cropCanvas.width = cW;
         cropCanvas.height = cH;
         const cropCtx = cropCanvas.getContext('2d');
         if (cropCtx) {
-          const sX = Math.round(canvas.width * 0.15);
-          const sY = Math.round(canvas.height * 0.30);
-          cropCtx.drawImage(videoEl, sX, sY, cW, cH, 0, 0, cW, cH);
-          croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.90);
+          const sX = Math.round(targetWidth * 0.15);
+          const sY = Math.round(targetHeight * 0.30);
+          cropCtx.drawImage(canvas, sX, sY, cW, cH, 0, 0, cW, cH);
+          croppedDataUrl = cropCanvas.toDataURL('image/jpeg', 0.85);
         }
       } catch (cropErr) {
         console.warn("Falha no recorte manual:", cropErr);
@@ -249,13 +266,19 @@ export default function VehiclesView({
 
       if (!res.ok) {
         let errorMsg = "Serviço de inteligência artificial de OCR indisponível.";
-        try {
-          const errData = await res.json();
-          if (errData && errData.error) {
-            errorMsg = errData.error;
+        if (res.status === 413) {
+          errorMsg = "A imagem capturada é pesada demais para os servidores de IA.";
+        } else {
+          try {
+            const errData = await res.json();
+            if (errData && errData.error) {
+              errorMsg = errData.error;
+            } else {
+              errorMsg = `Serviço de IA de OCR indisponível (Erro HTTP: ${res.status}).`;
+            }
+          } catch (e) {
+            errorMsg = `Serviço de IA de OCR indisponível (Erro HTTP: ${res.status}).`;
           }
-        } catch (e) {
-          // fallback to default
         }
         throw new Error(errorMsg);
       }
