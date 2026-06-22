@@ -32,6 +32,7 @@ export default function VehiclesView({
   const [ladoCamera, setLadoCamera] = useState<'environment' | 'user'>('environment');
   const [erroCamera, setErroCamera] = useState<string | null>(null);
   const [lendoOCR, setLendoOCR] = useState<boolean>(false);
+  const [lendoAutomatico, setLendoAutomatico] = useState<boolean>(false);
   const [resultadoOCR, setResultadoOCR] = useState<string | null>(null);
   const [veiculoEncontrado, setVeiculoEncontrado] = useState<Veiculo | null>(null);
   const [videoRef, setVideoRef] = useState<HTMLVideoElement | null>(null);
@@ -92,10 +93,10 @@ export default function VehiclesView({
   };
 
   const realizarLeituraAutomatica = async (videoEl: HTMLVideoElement | null) => {
-    if (!videoEl || lendoOCR || resultadoOCR || !abrirScanner || !streaming) return;
+    if (!videoEl || lendoOCR || lendoAutomatico || resultadoOCR || !abrirScanner || !streaming) return;
 
     try {
-      setLendoOCR(true);
+      setLendoAutomatico(true);
 
       const canvas = document.createElement('canvas');
       canvas.width = videoEl.videoWidth || 640;
@@ -107,32 +108,32 @@ export default function VehiclesView({
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
+      const placasCadastradas = veiculos.map(v => v.placa);
+
       const res = await fetch('/api/ocr-plate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ image: dataUrl })
+        body: JSON.stringify({ 
+          image: dataUrl,
+          registeredPlates: placasCadastradas
+        })
       });
 
       if (!res.ok) {
-        // Silêncio para permitir nova tentativa no próximo intervalo
         return;
       }
 
       const data = await res.json();
       if (!data.success) {
-        // Silêncio para permitir nova tentativa
         return;
       }
 
       const plateDetected = data.plate?.trim() || "";
       if (plateDetected === "NOT_FOUND" || !plateDetected) {
-        // Silêncio para continuar tentando
         return;
       }
-
-      setResultadoOCR(plateDetected);
 
       const normalize = (str: string) => str.toUpperCase().replace(/[^A-Z0-9]/g, '');
       const normalizedDetected = normalize(plateDetected);
@@ -152,14 +153,11 @@ export default function VehiclesView({
         setAbrirScanner(false); // FECHA A CÂMERA
         setResultadoOCR(null);
         setVeiculoEncontrado(null);
-      } else {
-        setVeiculoEncontrado(null);
       }
-
     } catch (err) {
       console.error("Erro no escaneamento automático silencioso:", err);
     } finally {
-      setLendoOCR(false);
+      setLendoAutomatico(false);
     }
   };
 
@@ -184,12 +182,17 @@ export default function VehiclesView({
       ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
 
+      const placasCadastradas = veiculos.map(v => v.placa);
+
       const res = await fetch('/api/ocr-plate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ image: dataUrl })
+        body: JSON.stringify({ 
+          image: dataUrl,
+          registeredPlates: placasCadastradas
+        })
       });
 
       if (!res.ok) {
@@ -258,20 +261,20 @@ export default function VehiclesView({
     };
   }, [abrirScanner, ladoCamera, videoRef]);
 
-  // Efeito de escaneamento automático a cada 2.5 segundos (estilo sensor de QR code)
+  // Efeito de escaneamento automático a cada 2.0 segundos (estilo sensor de QR code)
   useEffect(() => {
     let intervalId: any;
-    if (abrirScanner && streaming && !resultadoOCR && !lendoOCR && videoRef) {
+    if (abrirScanner && streaming && !resultadoOCR && !lendoOCR && !lendoAutomatico && videoRef) {
       intervalId = setInterval(() => {
         realizarLeituraAutomatica(videoRef);
-      }, 2500);
+      }, 2000);
     }
     return () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
     };
-  }, [abrirScanner, streaming, resultadoOCR, lendoOCR, videoRef, veiculos]);
+  }, [abrirScanner, streaming, resultadoOCR, lendoOCR, lendoAutomatico, videoRef, veiculos]);
   
   // Controle de cadastro
   const [mostrarForm, setMostrarForm] = useState<boolean>(false);
@@ -1327,21 +1330,31 @@ export default function VehiclesView({
                 />
               )}
 
+              {/* Scanning Active HUD status */}
+              {streaming && !resultadoOCR && (
+                <div className="absolute top-4 left-4 z-20 flex items-center gap-2 bg-[#0d1527]/90 border border-slate-750/80 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-lg">
+                  <div className={`w-2 h-2 rounded-full ${lendoAutomatico ? 'bg-emerald-500 animate-ping' : 'bg-sky-500 animate-pulse'}`} />
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-slate-100 font-mono">
+                    {lendoAutomatico ? 'IA Analisando Imagem...' : 'Auto-Scanner de Placas'}
+                  </span>
+                </div>
+              )}
+
               {/* Scanning Laser Line Overlay */}
               {streaming && !lendoOCR && !resultadoOCR && (
-                <div className="absolute inset-x-0 h-1 bg-emerald-500/80 shadow-[0_0_12px_#10b981] animate-bounce z-10 pointer-events-none" style={{ top: '40%' }} />
+                <div className="absolute inset-x-0 h-1 bg-emerald-500/80 shadow-[0_0_12px_#10b981] animate-bounce z-10 pointer-events-none" style={{ top: '45%' }} />
               )}
 
               {/* Target bracket outline */}
               {streaming && !resultadoOCR && !lendoOCR && (
-                <div className="absolute border-2 border-dashed border-sky-400/40 rounded-xl w-[75%] h-[35%] max-w-[450px] pointer-events-none flex items-center justify-center animate-pulse">
+                <div className="absolute border-2 border-dashed border-sky-455/40 border-sky-400/40 rounded-xl w-[75%] h-[40%] max-w-[450px] pointer-events-none flex items-center justify-center animate-pulse">
                   <div className="text-sky-300 text-[10px] font-mono tracking-wider bg-slate-950/80 px-2 py-1 rounded border border-sky-500/20 uppercase">
                     Centralize a Placa Aqui
                   </div>
                 </div>
               )}
 
-              {/* Loading spinner over the camera */}
+              {/* Loading spinner over the camera for manual click */}
               {lendoOCR && (
                 <div className="absolute inset-0 bg-slate-950/85 flex flex-col items-center justify-center gap-3 z-20">
                   <div className="w-10 h-10 border-4 border-sky-400 border-t-transparent rounded-full animate-spin" />

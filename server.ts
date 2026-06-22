@@ -32,10 +32,10 @@ async function startServer() {
     return aiClient;
   }
 
-  // End point para OCR de placas de veículos
+  // End point para OCR de placas de veículos ao vivo
   app.post("/api/ocr-plate", async (req, res) => {
     try {
-      const { image } = req.body;
+      const { image, registeredPlates } = req.body;
       if (!image) {
         return res.status(400).json({ error: "Nenhuma imagem foi recebida." });
       }
@@ -45,8 +45,15 @@ async function startServer() {
 
       const ai = getAiClient();
       
+      const platesListStr = registeredPlates && Array.isArray(registeredPlates) && registeredPlates.length > 0
+        ? `Você tem uma lista de placas cadastradas de veículos da frota real: [${registeredPlates.join(", ")}]. ` +
+          "Sua principal missão é identificar visualmente se a placa na imagem se assemelha ou corresponde à alguma desta lista, mesmo " +
+          "que haja uma leve imperfeição ou distorção visual na câmera (como confundir a letra 'O' com '0', 'I' ou 'L' com '1', 'B' com '8', etc.). " +
+          "Se houver uma combinação muito próxima com uma placa cadastrada da frota, você DEVE retornar exatamente o texto da placa cadastrada. "
+        : "";
+
       const response = await ai.models.generateContent({
-        model: "gemini-3.5-flash",
+        model: "gemini-2.5-flash",
         contents: {
           parts: [
             {
@@ -56,12 +63,13 @@ async function startServer() {
               },
             },
             {
-              text: "Você é um classificador especializado em OCR de placas de veículos brasileiros de alta precisão. " +
-                    "Analise a imagem fornecida e extraia apenas os caracteres da placa do veículo. " +
-                    "A placa pode ser no padrão antigo brasileiro (exemplo: 'ABC-1234' ou 'ABC1234') ou no padrão Mercosul (exemplo: 'ABC1D23'). " +
-                    "Retorne como resultado APENAS a placa encontrada em letras maiúsculas, sem hífen, espaços, traços ou qualquer outro texto explicativo. " +
+              text: "Você é um classificador e leitor óptico especializado em OCR de placas de veículos de alta precisão. " +
+                    "Analise a imagem da câmera e extraia os caracteres da placa do veículo brasileiro. " +
+                    "A placa pode estar no padrão antigo cinza (exemplo: 'ABC1234' ou 'ABC-1234') ou no padrão Mercosul (exemplo: 'ABC1D23'). " +
+                    platesListStr +
+                    "Retorne como resultado APENAS a placa identificada em letras maiúsculas, sem hífen, espaços, traços ou qualquer outro tipo de texto. " +
                     "Exemplo de saída correta: 'ABC1D23'. " +
-                    "Se não for possível encontrar nenhuma placa legível na imagem, responda apenas 'NOT_FOUND'.",
+                    "Se você não encontrar absolutamente nenhuma placa de veículo na imagem que pareça legível, retorne exatamente 'NOT_FOUND'.",
             }
           ]
         },
