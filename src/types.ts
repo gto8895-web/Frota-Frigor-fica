@@ -16,6 +16,8 @@ export interface Veiculo {
   statusRefrigeracao: StatusRefrigeracao;
   ultimaManutencao?: string; // Data
   marcaCaminhao: string; // Ex: Volvo, Scania, Mercedes-Benz
+  compressor?: string; // Compressor do sistema de refrigeração
+  correia?: string; // Correia do sistema de refrigeração
 }
 
 export interface Manutencao {

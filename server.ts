@@ -3,14 +3,21 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
+import fs from "fs";
 
 dotenv.config();
+
+// Ensure the persistent data directory exists
+const DATA_DIR = path.join(process.cwd(), "data");
+if (!fs.existsSync(DATA_DIR)) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  // Set body parser limits to support larger base64 images
+  // Set body parser limits to support larger base64 images and full sync payloads
   app.use(express.json({ limit: "15mb" }));
 
   // Allow CORS requests (such as from Vercel deployments)
@@ -42,6 +49,58 @@ async function startServer() {
     }
     return aiClient;
   }
+
+  // Endpoint para Sincronização em Nuvem - Gravar Dados
+  app.post("/api/sync/save", (req, res) => {
+    try {
+      const { codigoFrota, dados } = req.body;
+      if (!codigoFrota) {
+        return res.status(400).json({ success: false, error: "Código da frota é obrigatório." });
+      }
+      if (!dados) {
+        return res.status(400).json({ success: false, error: "Nenhum dado recebido para sincronização." });
+      }
+
+      // Sanitizar o código da frota para evitar path traversal
+      const safeCodigo = codigoFrota.replace(/[^a-zA-Z0-9_-]/g, "");
+      if (!safeCodigo) {
+        return res.status(400).json({ success: false, error: "Código da frota inválido." });
+      }
+
+      const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
+
+      res.json({ success: true, message: "Dados sincronizados com a nuvem com sucesso!" });
+    } catch (error: any) {
+      console.error("Erro ao salvar sincronização:", error);
+      res.status(500).json({ success: false, error: error.message || "Erro ao salvar dados no servidor." });
+    }
+  });
+
+  // Endpoint para Sincronização em Nuvem - Carregar Dados
+  app.get("/api/sync/load/:codigo", (req, res) => {
+    try {
+      const { codigo } = req.params;
+      if (!codigo) {
+        return res.status(400).json({ success: false, error: "Código da frota é obrigatório." });
+      }
+
+      const safeCodigo = codigo.replace(/[^a-zA-Z0-9_-]/g, "");
+      const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
+
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, error: "Código de frota não encontrado no servidor." });
+      }
+
+      const dataStr = fs.readFileSync(filePath, "utf8");
+      const dados = JSON.parse(dataStr);
+
+      res.json({ success: true, dados });
+    } catch (error: any) {
+      console.error("Erro ao carregar sincronização:", error);
+      res.status(500).json({ success: false, error: error.message || "Erro ao ler dados do servidor." });
+    }
+  });
 
   // End point para OCR de placas de veículos
   app.post("/api/ocr-plate", async (req, res) => {

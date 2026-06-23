@@ -1,6 +1,6 @@
 {
-  "name": "FrigoFrota - Gestão de Frota",
-  "short_name": "FrigoFrota",
+  "name": "RECUPERAR - GESTÃO DE FROTA",
+  "short_name": "RECUPERAR",
   "description": "Controle de frotas de caminhões frigoríficos, registro de manutenções e gerador de estimativas de orçamentos diários.",
   "start_url": "/",
   "display": "standalone",

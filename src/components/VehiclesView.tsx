@@ -2,6 +2,141 @@ import React, { useState, useEffect } from 'react';
 import { Veiculo, StatusVeiculo, StatusRefrigeracao, Manutencao, Avaria } from '../types';
 import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight, Camera, RefreshCw, VideoOff, Check } from 'lucide-react';
 
+// Helper component for Brand Logo using high-quality SVG inline
+export function LogoMarca({ marca, className = "w-5 h-5 flex-shrink-0" }: { marca: string; className?: string }) {
+  const normalized = (marca || '').trim().toLowerCase();
+
+  if (normalized.includes('volkswagen') || normalized.includes('vw')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="11" stroke="#3b82f6" strokeWidth="2" fill="white"/>
+        <path d="M6.5 7.5L10 16.5H11.5L15 7.5H13.5L11.5 13L9.5 7.5H8L10 13L12 7.5" fill="#1e3a8a" stroke="#1e3a8a" strokeWidth="0.5"/>
+        <path d="M8.5 7.5L11 14.5L12 12L13 14.5L15.5 7.5" stroke="#1e3a8a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    );
+  }
+  
+  if (normalized.includes('volvo')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="11" cy="13" r="8" stroke="#38bdf8" strokeWidth="2.5" fill="white"/>
+        <line x1="16" y1="8" x2="20" y2="4" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="16.5" y1="4" x2="20" y2="4" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round"/>
+        <line x1="20" y1="4" x2="20" y2="7.5" stroke="#38bdf8" strokeWidth="3" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+
+  if (normalized.includes('scania')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="11" stroke="#ef4444" strokeWidth="2" fill="#0f172a"/>
+        <circle cx="12" cy="12" r="7" fill="#1e3a8a" stroke="white" strokeWidth="0.5"/>
+        <path d="M10 8.5L12 6.5L14 8.5L13 10L11 10L10 8.5Z" fill="#f59e0b"/>
+      </svg>
+    );
+  }
+
+  if (normalized.includes('mercedes')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="11" stroke="#94a3b8" strokeWidth="1.5" fill="none"/>
+        <path d="M12 2.5V12L4.5 16.5M12 12L19.5 16.5" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    );
+  }
+
+  if (normalized.includes('iveco')) {
+    return (
+      <div className={`${className} bg-sky-600 rounded px-1 py-0.5 flex items-center justify-center font-black text-[7px] text-white tracking-tighter leading-none`}>
+        IVECO
+      </div>
+    );
+  }
+
+  if (normalized.includes('ford')) {
+    return (
+      <svg className={className} viewBox="0 0 32 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="16" cy="8" rx="14" ry="7" fill="#1d4ed8" stroke="white" strokeWidth="1"/>
+        <text x="16" y="11" fill="white" fontSize="8" fontWeight="bold" fontStyle="italic" fontFamily="serif" textAnchor="middle">Ford</text>
+      </svg>
+    );
+  }
+
+  if (normalized.includes('chevrolet')) {
+    return (
+      <svg className={className} viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M9 3H15V6H22V10H15V13H9V10H2V6H9V3Z" fill="#eab308" stroke="#ca8a04" strokeWidth="1"/>
+      </svg>
+    );
+  }
+
+  if (normalized.includes('fiat')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="12" cy="12" r="10" fill="#b91c1c" stroke="white" strokeWidth="1"/>
+        <text x="12" y="15.5" fill="white" fontSize="8" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle">FIAT</text>
+      </svg>
+    );
+  }
+
+  // Fallback icon
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="2" ry="2" />
+      <polygon points="16 8 20 8 23 11 23 16 16 16 16 8" />
+      <circle cx="5.5" cy="18.5" r="2.5" />
+      <circle cx="18.5" cy="18.5" r="2.5" />
+    </svg>
+  );
+}
+
+// Brazilian License Plate Component (Mercosul & Traditional styling)
+export function PlacaMercosul({ placa }: { placa: string }) {
+  const formatPlaca = (p: string) => {
+    let text = (p || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (text.length > 7) text = text.substring(0, 7);
+    return text;
+  };
+
+  const placaFormatada = formatPlaca(placa);
+
+  return (
+    <div className="inline-flex flex-col w-[120px] border border-blue-600 rounded-sm overflow-hidden bg-white shadow-md select-none font-sans">
+      {/* Blue Top Band */}
+      <div className="bg-[#0051A3] text-white px-1.5 py-0.5 flex items-center justify-between text-[7px] font-bold tracking-wider leading-none select-none h-3.5">
+        <span className="text-[5px] text-blue-200">✨</span>
+        <span className="uppercase text-[8px] font-sans font-extrabold tracking-widest text-center flex-1">BRASIL</span>
+        <span className="text-[8px] leading-none">🇧🇷</span>
+      </div>
+      {/* Plate Body */}
+      <div className="bg-white px-1 py-1 flex items-center justify-center relative min-h-[22px] border-t border-blue-600">
+        <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold">BR</span>
+        <span className="text-xs font-sans font-extrabold tracking-widest text-[#111111] leading-none">
+          {placaFormatada}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// Function to dynamically load Tesseract.js script from CDN as a solid offline fallback
+const carregarTesseract = (): Promise<any> => {
+  return new Promise((resolve, reject) => {
+    if ((window as any).Tesseract) {
+      resolve((window as any).Tesseract);
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.onload = () => {
+      resolve((window as any).Tesseract);
+    };
+    script.onerror = () => reject(new Error("Não foi possível carregar o motor de OCR offline."));
+    document.head.appendChild(script);
+  });
+};
+
 interface VehiclesViewProps {
   veiculos: Veiculo[];
   manutencoes?: Manutencao[];
@@ -129,6 +264,9 @@ export default function VehiclesView({
 
       // Tentar a rota relativa primeiro (para ambientes onde o backend está rodando no mesmo host)
       let res: Response | null = null;
+      let ocrSucessoServidor = false;
+      let plateDetected = "";
+
       try {
         res = await fetch('/api/ocr-plate', {
           method: 'POST',
@@ -137,13 +275,20 @@ export default function VehiclesView({
           },
           body: JSON.stringify({ image: dataUrl })
         });
+        if (res && res.ok) {
+          const data = await res.json();
+          if (data.success) {
+            plateDetected = data.plate?.trim() || "";
+            ocrSucessoServidor = true;
+          }
+        }
       } catch (err: any) {
         console.warn("Erro ao contactar rota local, tentando fallback...", err);
       }
 
       // Se falhar a rota relativa (ex: no Vercel que hospeda apenas arquivos estáticos)
       // usamos o fallback do servidor ativo Cloud Run
-      if (!res || !res.ok) {
+      if (!ocrSucessoServidor) {
         const fallbackUrl = "https://ais-pre-lkj2q4yf5sic737ubj5emu-422626548998.us-west2.run.app/api/ocr-plate";
         try {
           res = await fetch(fallbackUrl, {
@@ -153,29 +298,61 @@ export default function VehiclesView({
             },
             body: JSON.stringify({ image: dataUrl })
           });
+          if (res && res.ok) {
+            const data = await res.json();
+            if (data.success) {
+              plateDetected = data.plate?.trim() || "";
+              ocrSucessoServidor = true;
+            }
+          }
         } catch (err: any) {
+          console.warn("Erro no fallback de servidor, tentando OCR offline com Tesseract local...", err);
+        }
+      }
+
+      // Se falhar de todas as formas o servidor (como no Vercel estático fora do ambiente ou CORS),
+      // usamos o Tesseract offline no cliente de forma transparente!
+      if (!ocrSucessoServidor) {
+        try {
+          console.log("Iniciando processamento OCR local offline com Tesseract...");
+          const TesseractInstance = await carregarTesseract();
+          
+          // Executa o motor de OCR no próprio navegador
+          const result = await TesseractInstance.recognize(dataUrl, 'eng');
+          const rawText = result?.data?.text || "";
+          console.log("Tesseract extraiu o texto:", rawText);
+
+          // Regex para encontrar placas brasileiras (Mercosul ou antiga de 3 letras e 4 números)
+          const regexMercosul = /[A-Z]{3}[0-9][A-Z][0-9]{2}/i;
+          const regexAntiga = /[A-Z]{3}[- ]?[0-9]{4}/i;
+
+          const textoLimpo = rawText.toUpperCase().replace(/[^A-Z0-9-]/g, ' ');
+          let match = textoLimpo.match(regexMercosul);
+          if (!match) {
+            match = textoLimpo.match(regexAntiga);
+          }
+
+          if (match && match[0]) {
+            plateDetected = match[0].replace(/[^A-Z0-9]/g, '');
+            console.log("Placa encontrada pelo OCR local:", plateDetected);
+            ocrSucessoServidor = true;
+          } else {
+            // Tenta pegar qualquer termo de 7 caracteres que se assemelhe a placa
+            const palavras = rawText.toUpperCase().replace(/[^A-Z0-9]/g, ' ').split(/\s+/);
+            const possivelPlaca = palavras.find(palavra => palavra.length === 7 && /[A-Z]{3}/.test(palavra));
+            if (possivelPlaca) {
+              plateDetected = possivelPlaca;
+              console.log("Placa de 7 caracteres identificada pelo fallback:", plateDetected);
+              ocrSucessoServidor = true;
+            }
+          }
+        } catch (tessErr: any) {
+          console.error("Erro no Tesseract local:", tessErr);
           throw new Error("Serviço de inteligência artificial de OCR indisponível. Erro de rede ou indisponibilidade do servidor backend.");
         }
       }
 
-      if (!res || !res.ok) {
-        let errMsg = "Serviço de inteligência artificial de OCR indisponível.";
-        try {
-          const errData = await res.json();
-          if (errData && errData.error) {
-            errMsg = `${errMsg} (Detalhes: ${errData.error})`;
-          }
-        } catch (_) {}
-        throw new Error(errMsg);
-      }
-
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || "Houve uma falha ao processar a imagem com IA.");
-      }
-
-      const plateDetected = data.plate?.trim() || "";
-      if (plateDetected === "NOT_FOUND" || !plateDetected) {
+      if (!ocrSucessoServidor || plateDetected === "NOT_FOUND" || !plateDetected) {
         setResultadoOCR("Nenhuma placa de veículo identificada. Tente com outro ângulo.");
         setLendoOCR(false);
         return;
@@ -230,6 +407,8 @@ export default function VehiclesView({
   const [temperaturaAlvo, setTemperaturaAlvo] = useState<number>(-18);
   const [capacidadeCarga, setCapacidadeCarga] = useState<number>(10);
   const [status, setStatus] = useState<StatusVeiculo>('disponivel');
+  const [compressor, setCompressor] = useState<string>('');
+  const [correia, setCorreia] = useState<string>('');
 
   // Modo de edição
   const [editandoId, setEditandoId] = useState<string | null>(null);
@@ -362,13 +541,15 @@ export default function VehiclesView({
       marcaCaminhao,
       modelo,
       ano,
-      tipoRefrigeracao,
-      temperaturaAlvo: Number(temperaturaAlvo),
-      temperaturaAtual: Number(temperaturaAlvo) + (Math.random() * 1.5 - 0.75), // Começa próximo ao alvo
-      capacidadeCarga: Number(capacidadeCarga),
-      status,
-      statusRefrigeracao: status === 'disponivel' ? 'ok' : status === 'alerta' ? 'degradado' : 'falha',
-      ultimaManutencao: undefined
+      tipoRefrigeracao: 'Thermo King T-880R',
+      temperaturaAlvo: -18,
+      temperaturaAtual: -18 + (Math.random() * 1.5 - 0.75), // Começa próximo ao alvo
+      capacidadeCarga: 10,
+      status: 'disponivel',
+      statusRefrigeracao: 'ok',
+      ultimaManutencao: undefined,
+      compressor: compressor || 'Não informado',
+      correia: correia || 'Não informado'
     });
 
     // Resetar campos
@@ -378,6 +559,8 @@ export default function VehiclesView({
     setTemperaturaAlvo(-18);
     setCapacidadeCarga(10);
     setStatus('disponivel');
+    setCompressor('');
+    setCorreia('');
     setMostrarForm(false);
   };
 
@@ -535,13 +718,13 @@ export default function VehiclesView({
               <span className="font-mono text-xs bg-[#020617] border border-slate-755 px-3 py-1.5 rounded-lg font-bold text-sky-400 tracking-wider">
                 {v.placa}
               </span>
-              {v.status !== 'manutencao' && (
+              {v.status !== 'manutencao' && v.status !== 'disponivel' && (
                 <span className={`text-[11px] px-3 py-1.5 rounded-lg font-semibold uppercase tracking-wider border ${
-                  v.status === 'disponivel' 
-                    ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-400' 
+                  v.status === 'alerta' 
+                    ? 'bg-yellow-950/40 border-yellow-500/30 text-yellow-400'
                     : 'bg-yellow-950/40 border-yellow-500/30 text-yellow-400'
                 }`}>
-                  {v.status === 'disponivel' ? 'Disponível' : 'Alerta Climatização'}
+                  Alerta Climatização
                 </span>
               )}
             </div>
@@ -749,34 +932,7 @@ export default function VehiclesView({
 
           <form onSubmit={handleSubmeter} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Montadora</label>
-              <select
-                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 font-medium focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                value={marcaCaminhao}
-                onChange={(e) => setMarcaCaminhao(e.target.value)}
-              >
-                <option value="Mercedes-Benz">Mercedes-Benz</option>
-                <option value="Volvo">Volvo</option>
-                <option value="Scania">Scania</option>
-                <option value="Volkswagen">Volkswagen</option>
-                <option value="Iveco">Iveco</option>
-                <option value="MAN">MAN / DAF</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Modelo / Descrição Comercial</label>
-              <input
-                type="text"
-                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                placeholder="Ex: Atego 2430 6x2"
-                value={modelo}
-                onChange={(e) => setModelo(e.target.value)}
-                required
-              />
-            </div>
-
+            {/* 1. PLACA */}
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Placa (Identificador)</label>
               <input
@@ -790,6 +946,39 @@ export default function VehiclesView({
               />
             </div>
 
+            {/* 2. MARCA */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Marca (Montadora)</label>
+              <select
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 font-medium focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                value={marcaCaminhao}
+                onChange={(e) => setMarcaCaminhao(e.target.value)}
+              >
+                <option value="Mercedes-Benz">Mercedes-Benz</option>
+                <option value="Volvo">Volvo</option>
+                <option value="Scania">Scania</option>
+                <option value="Volkswagen">Volkswagen</option>
+                <option value="Iveco">Iveco</option>
+                <option value="Ford">Ford</option>
+                <option value="Chevrolet">Chevrolet</option>
+                <option value="Fiat">Fiat</option>
+              </select>
+            </div>
+
+            {/* 3. MODELO */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Modelo / Descrição Comercial</label>
+              <input
+                type="text"
+                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                placeholder="Ex: Atego 2430 6x2"
+                value={modelo}
+                onChange={(e) => setModelo(e.target.value)}
+                required
+              />
+            </div>
+
+            {/* 4. ANO */}
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ano Fabricação</label>
               <input
@@ -803,58 +992,30 @@ export default function VehiclesView({
               />
             </div>
 
+            {/* 5. COMPRESSOR */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Equipamento de Frio</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Compressor</label>
               <input
                 type="text"
                 className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                placeholder="Ex: Thermo King T-880R"
-                value={tipoRefrigeracao}
-                onChange={(e) => setTipoRefrigeracao(e.target.value)}
+                placeholder="Ex: Sanden SD7H15"
+                value={compressor}
+                onChange={(e) => setCompressor(e.target.value)}
                 required
               />
             </div>
 
+            {/* 6. CORREIA */}
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Capacidade Carga (Tons)</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Correia</label>
               <input
-                type="number"
-                step="0.1"
-                min={1}
-                max={50}
+                type="text"
                 className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                value={capacidadeCarga}
-                onChange={(e) => setCapacidadeCarga(Number(e.target.value))}
+                placeholder="Ex: PK 1090"
+                value={correia}
+                onChange={(e) => setCorreia(e.target.value)}
                 required
               />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Setpoint Térmico Alvo (°C)</label>
-              <input
-                type="number"
-                min={-30}
-                max={25}
-                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                value={temperaturaAlvo}
-                onChange={(e) => setTemperaturaAlvo(Number(e.target.value))}
-                required
-                placeholder="Ex: -18 para ultracongelados"
-              />
-              <span className="text-xxs text-slate-400 mt-1 block">Ideal: congelado (-20°C a -18°C), resfriado (2°C a 4°C).</span>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Status Operativo Inicial</label>
-              <select
-                className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 font-medium focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                value={status}
-                onChange={(e) => setStatus(e.target.value as StatusVeiculo)}
-              >
-                <option value="disponivel">Disponível para Viagem</option>
-                <option value="alerta">Risco de Climatização (Alerta)</option>
-                <option value="manutencao">Retido em Manutenção (Oficina)</option>
-              </select>
             </div>
 
             <div className="md:col-span-3 flex justify-end gap-3 border-t border-slate-800 pt-4 mt-2">
@@ -947,12 +1108,17 @@ export default function VehiclesView({
                   >
                     {!isEditando ? (
                       <div className="flex justify-between items-start gap-2">
-                        <div className="flex-1 min-w-0">
-                          <span className="font-mono text-xs bg-[#020617] border border-slate-700 px-2.5 py-1 rounded-md font-bold text-sky-400 tracking-wider">
-                            {v.placa}
-                          </span>
-                          <p className="text-xs font-semibold text-slate-400 mt-2">{v.marcaCaminhao}</p>
-                          <h4 className="font-display font-medium text-white text-base leading-tight mt-0.5 group-hover/header:text-sky-350 transition-colors truncate">
+                        <div className="flex-1 min-w-0 space-y-2">
+                          {/* Placa no formato de placa do Brasil */}
+                          <PlacaMercosul placa={v.placa} />
+                          
+                          {/* Marca com Logo */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <LogoMarca marca={v.marcaCaminhao} className="w-4.5 h-4.5 text-sky-450" />
+                            <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">{v.marcaCaminhao}</p>
+                          </div>
+
+                          <h4 className="font-display font-semibold text-white text-base leading-tight mt-1 group-hover/header:text-sky-355 transition-colors truncate">
                             {v.modelo}
                           </h4>
                         </div>

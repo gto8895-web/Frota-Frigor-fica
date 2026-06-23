@@ -66,6 +66,17 @@ export default function App() {
     return `${year}-${month}-${day}`;
   });
   const [tabAtiva, setTabAtiva] = useState<'dashboard' | 'veiculos' | 'manutencoes' | 'orcamento' | 'compras' | 'backup'>('dashboard');
+  
+  // Sincronização em nuvem (RECUPERAR)
+  const [codigoFrota, setCodigoFrota] = useState<string>(() => {
+    return localStorage.getItem('recuperar_codigo_frota') || '';
+  });
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    return localStorage.getItem('recuperar_auto_sync') === 'true';
+  });
+
   const [currentTime, setCurrentTime] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -327,8 +338,121 @@ export default function App() {
   const handleClearHistoryAndAvarias = () => {
     setManutencoes([]);
     localStorage.setItem('ff_manutencoes', JSON.stringify([]));
-    localStorage.setItem('frigofrota_avarias', JSON.stringify({}));
+    localStorage.setItem('frigofruns_avarias', JSON.stringify({}));
   };
+
+  // Sincronização em nuvem (RECUPERAR)
+  const sincronizarComNuvem = async (codigoOverride?: string) => {
+    const cod = codigoOverride || codigoFrota;
+    if (!cod.trim()) return;
+
+    setSyncStatus('syncing');
+    setSyncError(null);
+
+    // Agrupar todos os dados locais para salvar
+    const dados = {
+      veiculos,
+      manutencoes,
+      custoPadraoDiario,
+      shoppingList: JSON.parse(localStorage.getItem('frigofrota_shopping_list') || '[]'),
+      avarias: JSON.parse(localStorage.getItem('frigofrota_avarias') || '{}'),
+      opcoesManutencao: JSON.parse(localStorage.getItem('frigofrota_opcoes_manutencao') || '[]'),
+    };
+
+    try {
+      const res = await fetch('/api/sync/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ codigoFrota: cod.trim().toUpperCase(), dados }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Erro ao salvar dados na nuvem.');
+      }
+
+      setSyncStatus('success');
+      localStorage.setItem('recuperar_codigo_frota', cod.trim().toUpperCase());
+      setTimeout(() => setSyncStatus('idle'), 3000);
+    } catch (err: any) {
+      console.error(err);
+      setSyncStatus('error');
+      setSyncError(err.message || 'Falha na conexão com o servidor de sincronização.');
+    }
+  };
+
+  const carregarDaNuvem = async (codigoInput: string) => {
+    if (!codigoInput.trim()) {
+      alert('Por favor, informe o código da frota.');
+      return;
+    }
+
+    setSyncStatus('syncing');
+    setSyncError(null);
+
+    try {
+      const res = await fetch(`/api/sync/load/${codigoInput.trim().toUpperCase()}`);
+      if (!res.ok) {
+        if (res.status === 404) {
+          throw new Error('Código de frota não localizado na nuvem. Verifique a grafia.');
+        }
+        throw new Error('Erro ao baixar os dados.');
+      }
+
+      const data = await res.json();
+      if (data.success && data.dados) {
+        const { veiculos, manutencoes, custoPadraoDiario, shoppingList, avarias, opcoesManutencao } = data.dados;
+
+        if (veiculos) {
+          setVeiculos(veiculos);
+          localStorage.setItem('ff_veiculos', JSON.stringify(veiculos));
+        }
+        if (manutencoes) {
+          setManutencoes(manutencoes);
+          localStorage.setItem('ff_manutencoes', JSON.stringify(manutencoes));
+        }
+        if (custoPadraoDiario) {
+          setCustoPadraoDiario(custoPadraoDiario);
+          localStorage.setItem('ff_custo_diario', String(custoPadraoDiario));
+        }
+        if (shoppingList) {
+          localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
+        }
+        if (avarias) {
+          localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
+        }
+        if (opcoesManutencao) {
+          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
+        }
+
+        setCodigoFrota(codigoInput.trim().toUpperCase());
+        localStorage.setItem('recuperar_codigo_frota', codigoInput.trim().toUpperCase());
+        setSyncStatus('success');
+        alert('Dados da Frota RECUPERADOS e sincronizados com sucesso!');
+        setTimeout(() => setSyncStatus('idle'), 3000);
+        window.location.reload();
+      }
+    } catch (err: any) {
+      console.error(err);
+      setSyncStatus('error');
+      setSyncError(err.message || 'Falha de conexão ou código incorreto.');
+      alert(err.message || 'Código de frota não encontrado.');
+    }
+  };
+
+  useEffect(() => {
+    if (autoSync && codigoFrota) {
+      const timer = setTimeout(() => {
+        sincronizarComNuvem();
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [veiculos, manutencoes, autoSync, codigoFrota]);
+
+  useEffect(() => {
+    localStorage.setItem('recuperar_auto_sync', String(autoSync));
+  }, [autoSync]);
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col justify-between">
@@ -345,7 +469,7 @@ export default function App() {
               </div>
               <div>
                 <span className="font-display font-black text-sky-400 text-base tracking-tight block">
-                  FRIGO-FROTA
+                  RECUPERAR
                 </span>
               </div>
             </div>
@@ -599,6 +723,14 @@ export default function App() {
             onRestoreBackup={handleRestoreBackup}
             onClearHistoryAndAvarias={handleClearHistoryAndAvarias}
             onBack={() => setTabAtiva('dashboard')}
+            codigoFrota={codigoFrota}
+            setCodigoFrota={setCodigoFrota}
+            syncStatus={syncStatus}
+            syncError={syncError}
+            autoSync={autoSync}
+            setAutoSync={setAutoSync}
+            onSincronizarComNuvem={sincronizarComNuvem}
+            onCarregarDaNuvem={carregarDaNuvem}
           />
         )}
 

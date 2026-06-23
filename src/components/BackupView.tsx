@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Database, ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileJson, Clock, RefreshCw } from 'lucide-react';
+import { Database, ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileJson, Clock, RefreshCw, Cloud, CloudLightning, ShieldCheck, Wifi, HelpCircle } from 'lucide-react';
 import { Veiculo, Manutencao } from '../types';
 
 interface BackupViewProps {
@@ -14,6 +14,16 @@ interface BackupViewProps {
   }) => void;
   onClearHistoryAndAvarias?: () => void;
   onBack: () => void;
+
+  // Sincronização em Nuvem (RECUPERAR)
+  codigoFrota: string;
+  setCodigoFrota: (cod: string) => void;
+  syncStatus: 'idle' | 'syncing' | 'success' | 'error';
+  syncError: string | null;
+  autoSync: boolean;
+  setAutoSync: (val: boolean) => void;
+  onSincronizarComNuvem: (codigoOverride?: string) => Promise<void>;
+  onCarregarDaNuvem: (codigoInput: string) => Promise<void>;
 }
 
 export default function BackupView({
@@ -22,7 +32,15 @@ export default function BackupView({
   custoPadraoDiario,
   onRestoreBackup,
   onClearHistoryAndAvarias,
-  onBack
+  onBack,
+  codigoFrota,
+  setCodigoFrota,
+  syncStatus,
+  syncError,
+  autoSync,
+  setAutoSync,
+  onSincronizarComNuvem,
+  onCarregarDaNuvem
 }: BackupViewProps) {
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -191,6 +209,106 @@ export default function BackupView({
               </div>
             </div>
           )}
+
+          {/* SEÇÃO PRINCIPAL DE SINCRONIZAÇÃO EM NUVEM (RECUPERAR CLOUD SYNC) */}
+          <div className="bg-[#020617] border border-sky-500/30 rounded-xl p-5 shadow-inner space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
+                <Cloud className="w-5 h-5 animate-pulse" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-white text-sm uppercase tracking-wider">RECUPERAR — Sincronização em Nuvem</h3>
+                <p className="text-[11px] text-slate-400">Salve seus dados na nuvem e recupere instantaneamente em qualquer aparelho celular se limpar o Chrome.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Código da sua Frota</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    maxLength={15}
+                    value={codigoFrota}
+                    onChange={(e) => setCodigoFrota(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                    placeholder="Ex: FROTA-ABC"
+                    className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono font-bold text-sky-400 uppercase focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rand = 'FR-' + Math.random().toString(36).substring(2, 8).toUpperCase();
+                      setCodigoFrota(rand);
+                    }}
+                    title="Gerar código aleatório"
+                    className="bg-slate-800 hover:bg-slate-700 text-slate-350 font-bold px-2.5 rounded-lg text-xs border border-slate-700 transition-colors cursor-pointer"
+                  >
+                    Gerar
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Insira um código personalizado (letras e números) para identificar seus dados de forma exclusiva.</p>
+              </div>
+
+              <div className="flex flex-col justify-end">
+                <label className="flex items-center gap-2 cursor-pointer bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800 hover:border-slate-700 transition-all">
+                  <input
+                    type="checkbox"
+                    checked={autoSync}
+                    onChange={(e) => setAutoSync(e.target.checked)}
+                    className="w-4 h-4 text-sky-400 bg-[#020617] border-slate-700 rounded focus:ring-sky-400 focus:ring-offset-[#1e293b]"
+                  />
+                  <div className="text-left">
+                    <p className="text-xs font-semibold text-slate-200">Sincronização Automática</p>
+                    <p className="text-[10px] text-slate-400">Salva na nuvem a cada alteração em tempo real</p>
+                  </div>
+                </label>
+              </div>
+            </div>
+
+            {/* Ações de sincronização */}
+            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => onSincronizarComNuvem()}
+                disabled={syncStatus === 'syncing' || !codigoFrota.trim()}
+                className="flex-1 flex items-center justify-center gap-2 bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
+              >
+                {syncStatus === 'syncing' ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <CloudLightning className="w-3.5 h-3.5" />
+                )}
+                Salvar Frota na Nuvem
+              </button>
+
+              <button
+                type="button"
+                onClick={() => onCarregarDaNuvem(codigoFrota)}
+                disabled={syncStatus === 'syncing' || !codigoFrota.trim()}
+                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-sky-450" />
+                Recuperar Dados da Nuvem
+              </button>
+            </div>
+
+            {/* Status e Erros */}
+            {syncStatus === 'syncing' && (
+              <p className="text-xs text-sky-400 flex items-center gap-1.5 animate-pulse justify-center">
+                <Wifi className="w-3.5 h-3.5 animate-bounce" /> Comunicando com a nuvem RECUPERAR...
+              </p>
+            )}
+            {syncStatus === 'success' && (
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5 justify-center font-semibold">
+                <ShieldCheck className="w-4 h-4 animate-bounce" /> Operação realizada e salva em nuvem com sucesso!
+              </p>
+            )}
+            {syncStatus === 'error' && (
+              <p className="text-xs text-rose-400 flex items-center gap-1.5 justify-center font-semibold text-center">
+                <AlertTriangle className="w-4 h-4 shrink-0" /> {syncError || 'Falha ao sincronizar com a nuvem.'}
+              </p>
+            )}
+          </div>
 
           {/* Resumo da base atual */}
           <div className="bg-[#020617]/50 rounded-xl border border-slate-800 p-4">
