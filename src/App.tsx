@@ -574,7 +574,7 @@ export default function App() {
               </div>
               <div>
                 <h4 className="font-display font-semibold text-white text-sm">Rodar como Aplicativo Nativo (PWA)</h4>
-                <p className="text-xs text-slate-400 mt-0.5">Disponibilize o FrigoFrota na tela inicial para acesso instantâneo nos seus trajetos.</p>
+                <p className="text-xs text-slate-400 mt-0.5">Disponibilize o RECUPERAR na tela inicial para acesso instantâneo nos seus trajetos.</p>
               </div>
             </div>
             <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
@@ -635,7 +635,7 @@ export default function App() {
               {/* Conteúdo das Instruções */}
               <div className="space-y-4">
                 <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                  Para rodar o <span className="text-sky-400 font-semibold">FrigoFrota</span> como um aplicativo móvel nativo em aparelhos iOS (ou no Google Chrome do seu <span className="text-white font-semibold">iPhone 12 Pro Max</span>), siga as instruções rápidas:
+                  Para rodar o <span className="text-sky-400 font-semibold">RECUPERAR</span> como um aplicativo móvel nativo em aparelhos iOS (ou no Google Chrome do seu <span className="text-white font-semibold">iPhone 12 Pro Max</span>), siga as instruções rápidas:
                 </p>
 
                 {/* No Chrome / Safari no iOS */}
@@ -654,7 +654,7 @@ export default function App() {
                       Role a lista para baixo e toque em <strong>"Adicionar à Tela de Início"</strong>.
                     </li>
                     <li>
-                      Defina o título como <strong>"FrigoFrota"</strong> e toque em <strong>"Adicionar"</strong> no canto superior direito.
+                      Defina o título como <strong>"RECUPERAR"</strong> e toque em <strong>"Adicionar"</strong> no canto superior direito.
                     </li>
                   </ol>
                 </div>
