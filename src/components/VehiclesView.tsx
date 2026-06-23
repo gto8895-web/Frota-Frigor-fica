@@ -715,9 +715,7 @@ export default function VehiclesView({
               Voltar para Frota
             </button>
             <div className="flex items-center gap-3">
-              <span className="font-mono text-xs bg-[#020617] border border-slate-755 px-3 py-1.5 rounded-lg font-bold text-sky-400 tracking-wider">
-                {v.placa}
-              </span>
+              <PlacaMercosul placa={v.placa} />
               {v.status !== 'manutencao' && v.status !== 'disponivel' && (
                 <span className={`text-[11px] px-3 py-1.5 rounded-lg font-semibold uppercase tracking-wider border ${
                   v.status === 'alerta' 
@@ -732,8 +730,11 @@ export default function VehiclesView({
 
           {/* Ficha Básica - Bento Card */}
           <div className="bg-[#1e293b] rounded-2xl border border-slate-800 p-5 shadow-lg">
-            <div className="space-y-1">
-              <p className="text-xs text-sky-450 font-bold uppercase tracking-wider">{v.marcaCaminhao}</p>
+            <div className="space-y-2">
+              <div className="flex items-center gap-1.5">
+                <LogoMarca marca={v.marcaCaminhao} className="w-5 h-5 text-sky-450" />
+                <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">{v.marcaCaminhao}</p>
+              </div>
               <h1 className="text-2xl font-display font-bold text-white tracking-tight">{v.modelo}</h1>
               <p className="text-xs text-slate-400 font-mono">Ano de Fabricação: <span className="text-white">{v.ano}</span></p>
             </div>
