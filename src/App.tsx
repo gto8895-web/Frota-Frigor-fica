@@ -481,10 +481,10 @@ export default function App() {
       {/* barra superior administrativa (Cabecalho) no-print */}
       <header className="bg-[#020617] border-b border-slate-800/70 sticky top-0 z-40 shadow-md no-print">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
+          <div className="flex justify-between h-16 items-center gap-3">
             
             {/* Logo Corporativa */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 shrink-0">
               <div className="p-2 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-xl shadow-xs">
                 <Truck className="w-5 h-5" />
               </div>
@@ -523,8 +523,8 @@ export default function App() {
             </nav>
 
             {/* Estatísticas resumidas na Direção do Usuário */}
-            <div className="flex items-center gap-3">
-              <span className="bg-[#1e293b] text-slate-300 border border-slate-700 rounded-lg px-2.5 py-1 text-xxs font-mono font-medium flex items-center gap-1.5 shadow-sm">
+            <div className="flex items-center shrink-0">
+              <span className="bg-[#1e293b] text-slate-300 border border-slate-700 rounded-lg px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xxs font-mono font-medium flex items-center gap-1 sm:gap-1.5 shadow-sm">
                 <span>📅 {dataReferencia.split('-').reverse().join('/')}</span>
                 <span className="text-slate-500">|</span>
                 <span>🕒 {currentTime}</span>
