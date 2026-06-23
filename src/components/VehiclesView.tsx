@@ -80,6 +80,15 @@ export function LogoMarca({ marca, className = "w-5 h-5 flex-shrink-0" }: { marc
     );
   }
 
+  if (normalized.includes('kia')) {
+    return (
+      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <ellipse cx="12" cy="12" rx="11" ry="7" fill="#c21a1a" stroke="white" strokeWidth="1"/>
+        <text x="12" y="14.5" fill="white" fontSize="7" fontWeight="bold" fontFamily="sans-serif" textAnchor="middle" letterSpacing="0.5">KIA</text>
+      </svg>
+    );
+  }
+
   // Fallback icon
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -402,7 +411,7 @@ export default function VehiclesView({
   const [marcaCaminhao, setMarcaCaminhao] = useState<string>('Volkswagen');
   const [modelo, setModelo] = useState<string>('');
   const [placa, setPlaca] = useState<string>('');
-  const [ano, setAno] = useState<number>(new Date().getFullYear());
+  const [ano, setAno] = useState<string | number>(String(new Date().getFullYear()));
   const [tipoRefrigeracao, setTipoRefrigeracao] = useState<string>('Thermo King T-880R');
   const [temperaturaAlvo, setTemperaturaAlvo] = useState<number>(-18);
   const [capacidadeCarga, setCapacidadeCarga] = useState<number>(10);
@@ -555,7 +564,7 @@ export default function VehiclesView({
     // Resetar campos
     setModelo('');
     setPlaca('');
-    setAno(new Date().getFullYear());
+    setAno(String(new Date().getFullYear()));
     setTemperaturaAlvo(-18);
     setCapacidadeCarga(10);
     setStatus('disponivel');
@@ -983,12 +992,11 @@ export default function VehiclesView({
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ano Fabricação</label>
               <input
-                type="number"
-                min={2000}
-                max={new Date().getFullYear() + 1}
+                type="text"
+                placeholder="Ex: 21/21 ou 2021"
                 className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
                 value={ano}
-                onChange={(e) => setAno(Number(e.target.value))}
+                onChange={(e) => setAno(e.target.value)}
                 required
               />
             </div>

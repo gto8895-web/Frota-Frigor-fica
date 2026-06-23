@@ -7,7 +7,7 @@ export interface Veiculo {
   id: string;
   placa: string;
   modelo: string;
-  ano: number;
+  ano: string | number;
   tipoRefrigeracao: string; // Ex: Thermo King T-880R, Carrier Supra 1150
   temperaturaAlvo: number; // Temperatura alvo em °C (ex: -18°C para congelados, 4°C para resfriados)
   temperaturaAtual: number; // Temperatura detectada em tempo real (simulada)

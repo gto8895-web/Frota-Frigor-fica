@@ -13,7 +13,28 @@ export default function App() {
   // Inicialização de estados reativos persistidos ou fallback de mock-data
   const [veiculos, setVeiculos] = useState<Veiculo[]>(() => {
     const salvos = localStorage.getItem('ff_veiculos');
-    return salvos ? JSON.parse(salvos) : INITIAL_VEHICLES;
+    if (salvos) {
+      try {
+        const parsed = JSON.parse(salvos) as Veiculo[];
+        // Remove os veículos de teste criados anteriormente (ex: FRG-2B45, COL-7E89, etc)
+        const hasOldTestVehicles = parsed.some(v => 
+          v.placa === 'FRG-2B45' || 
+          v.placa === 'COL-7E89' || 
+          v.placa === 'ICE-4D12' || 
+          v.placa === 'SNW-9A34' || 
+          v.placa === 'GLC-1F78'
+        );
+        // Se houver algum veículo antigo de teste ou a lista estiver vazia/desatualizada
+        if (hasOldTestVehicles) {
+          localStorage.setItem('ff_veiculos', JSON.stringify(INITIAL_VEHICLES));
+          return INITIAL_VEHICLES;
+        }
+        return parsed;
+      } catch (e) {
+        return INITIAL_VEHICLES;
+      }
+    }
+    return INITIAL_VEHICLES;
   });
 
   const [manutencoes, setManutencoes] = useState<Manutencao[]>(() => {
