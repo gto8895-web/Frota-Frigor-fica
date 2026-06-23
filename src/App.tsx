@@ -524,7 +524,7 @@ export default function App() {
 
             {/* Estatísticas resumidas na Direção do Usuário */}
             <div className="flex items-center shrink-0">
-              <span className="bg-[#1e293b] text-slate-300 border border-slate-700 rounded-lg px-1.5 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xxs font-mono font-medium flex items-center gap-1 sm:gap-1.5 shadow-sm">
+              <span className="bg-[#1e293b] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs sm:text-sm font-mono font-medium flex items-center gap-1.5 sm:gap-2 shadow-md">
                 <span>📅 {dataReferencia.split('-').reverse().join('/')}</span>
                 <span className="text-slate-500">|</span>
                 <span>🕒 {currentTime}</span>

@@ -1,0 +1,27 @@
+{
+  "entities": {
+    "FrotaSync": {
+      "title": "Sincronização de Frota",
+      "description": "Dados completos da frota sincronizados pelo usuário",
+      "type": "object",
+      "properties": {
+        "dados": {
+          "type": "object",
+          "description": "Objeto completo com os dados locais (veículos, manutenções, lista de compras, avarias, etc.)"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Data e hora da última sincronização na nuvem"
+        }
+      },
+      "required": ["dados", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/frotas/{codigoFrota}": {
+      "schema": "FrotaSync",
+      "description": "Documento único para cada código de frota de veículo frigorífico"
+    }
+  }
+}

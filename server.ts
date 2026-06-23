@@ -4,6 +4,8 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import fs from "fs";
+import { initializeApp } from "firebase/app";
+import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 dotenv.config();
 
@@ -11,6 +13,22 @@ dotenv.config();
 const DATA_DIR = path.join(process.cwd(), "data");
 if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
+}
+
+// Initialize Firebase Firestore dynamically if configuration exists
+let db: any = null;
+try {
+  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+  if (fs.existsSync(firebaseConfigPath)) {
+    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
+    const firebaseApp = initializeApp(config);
+    db = getFirestore(firebaseApp, config.firestoreDatabaseId);
+    console.log("Firebase Firestore inicializado com sucesso usando o banco de dados:", config.firestoreDatabaseId);
+  } else {
+    console.warn("firebase-applet-config.json não localizado. Usando persistência em disco local como fallback.");
+  }
+} catch (error) {
+  console.error("Falha ao inicializar o Firebase Firestore:", error);
 }
 
 async function startServer() {
@@ -51,7 +69,7 @@ async function startServer() {
   }
 
   // Endpoint para Sincronização em Nuvem - Gravar Dados
-  app.post("/api/sync/save", (req, res) => {
+  app.post("/api/sync/save", async (req, res) => {
     try {
       const { codigoFrota, dados } = req.body;
       if (!codigoFrota) {
@@ -61,16 +79,38 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "Nenhum dado recebido para sincronização." });
       }
 
-      // Sanitizar o código da frota para evitar path traversal
-      const safeCodigo = codigoFrota.replace(/[^a-zA-Z0-9_-]/g, "");
+      // Sanitizar o código da frota
+      const safeCodigo = codigoFrota.trim().toUpperCase().replace(/[^a-zA-Z0-9_-]/g, "");
       if (!safeCodigo) {
         return res.status(400).json({ success: false, error: "Código da frota inválido." });
       }
 
+      // Gravar no Firestore (Nuvem Real e Durável)
+      let savedToCloud = false;
+      if (db) {
+        try {
+          const docRef = doc(db, "frotas", safeCodigo);
+          await setDoc(docRef, {
+            dados,
+            updatedAt: new Date().toISOString(),
+          });
+          console.log(`[Firestore] Sincronização bem sucedida para: ${safeCodigo}`);
+          savedToCloud = true;
+        } catch (firestoreError: any) {
+          console.error("Erro ao gravar no Firestore:", firestoreError);
+        }
+      }
+
+      // Sempre grava localmente também para redundância e cache local
       const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
       fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
 
-      res.json({ success: true, message: "Dados sincronizados com a nuvem com sucesso!" });
+      res.json({ 
+        success: true, 
+        message: savedToCloud 
+          ? "Dados sincronizados com a nuvem (Firestore) com sucesso!" 
+          : "Dados salvos localmente no servidor (fallback offline)." 
+      });
     } catch (error: any) {
       console.error("Erro ao salvar sincronização:", error);
       res.status(500).json({ success: false, error: error.message || "Erro ao salvar dados no servidor." });
@@ -78,18 +118,38 @@ async function startServer() {
   });
 
   // Endpoint para Sincronização em Nuvem - Carregar Dados
-  app.get("/api/sync/load/:codigo", (req, res) => {
+  app.get("/api/sync/load/:codigo", async (req, res) => {
     try {
       const { codigo } = req.params;
       if (!codigo) {
         return res.status(400).json({ success: false, error: "Código da frota é obrigatório." });
       }
 
-      const safeCodigo = codigo.replace(/[^a-zA-Z0-9_-]/g, "");
-      const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
+      const safeCodigo = codigo.trim().toUpperCase().replace(/[^a-zA-Z0-9_-]/g, "");
+      if (!safeCodigo) {
+        return res.status(400).json({ success: false, error: "Código da frota inválido." });
+      }
 
+      // Carregar do Firestore
+      if (db) {
+        try {
+          const docRef = doc(db, "frotas", safeCodigo);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            console.log(`[Firestore] Dados carregados com sucesso para a frota: ${safeCodigo}`);
+            return res.json({ success: true, dados: data.dados });
+          }
+          console.log(`[Firestore] Código ${safeCodigo} não encontrado no Firestore. Verificando em disco local...`);
+        } catch (firestoreError) {
+          console.error("Erro ao carregar do Firestore:", firestoreError);
+        }
+      }
+
+      // Fallback em disco local
+      const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
       if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ success: false, error: "Código de frota não encontrado no servidor." });
+        return res.status(404).json({ success: false, error: "Código de frota não encontrado na nuvem ou no servidor." });
       }
 
       const dataStr = fs.readFileSync(filePath, "utf8");
