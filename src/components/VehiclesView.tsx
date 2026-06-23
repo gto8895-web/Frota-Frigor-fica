@@ -745,7 +745,7 @@ export default function VehiclesView({
                 <p className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">{v.marcaCaminhao}</p>
               </div>
               <h1 className="text-2xl font-display font-bold text-white tracking-tight">{v.modelo}</h1>
-              <p className="text-xs text-slate-400 font-mono">Ano de Fabricação: <span className="text-white">{v.ano}</span></p>
+              <p className="text-xs text-slate-400 font-mono">ANO: <span className="text-white">{v.ano}</span></p>
             </div>
           </div>
 
@@ -764,7 +764,7 @@ export default function VehiclesView({
                     <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Check-list de avarias físicas para controle do veículo</p>
                   </div>
                   <span className="bg-[#020617] border border-slate-800 px-2.5 py-1 rounded-lg text-xxs font-mono text-slate-350 font-bold">
-                    {avariasDaViatura.filter(av => !av.resolvido).length} pendentes
+                    {avariasDaViatura.filter(av => !av.resolvido).length}
                   </span>
                 </div>
 
@@ -854,7 +854,7 @@ export default function VehiclesView({
                     <p className="text-[10px] text-slate-400 mt-0.5 font-sans">Ordens de serviço e manutenções adicionadas deste veículo</p>
                   </div>
                   <span className="bg-[#020617] border border-slate-800 px-2.5 py-1 rounded-lg text-xxs font-mono text-sky-400 font-bold">
-                    {historicoManutencoes.length} registradas
+                    {historicoManutencoes.length}
                   </span>
                 </div>
 
