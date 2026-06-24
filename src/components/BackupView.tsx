@@ -45,6 +45,37 @@ export default function BackupView({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const [nomeEmpresa, setNomeEmpresa] = useState<string>(() => {
+    return localStorage.getItem('recuperar_nome_empresa') || '';
+  });
+  const [frotasExistentes, setFrotasExistentes] = useState<{ codigo: string; nomeEmpresa: string; updatedAt?: string }[]>([]);
+  const [loadingFrotas, setLoadingFrotas] = useState(false);
+
+  React.useEffect(() => {
+    const fetchFrotas = async () => {
+      setLoadingFrotas(true);
+      try {
+        const res = await fetch('/api/sync/fleets');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.frotas) {
+            setFrotasExistentes(data.frotas);
+          }
+        }
+      } catch (e) {
+        console.error('Erro ao buscar frotas:', e);
+      } finally {
+        setLoadingFrotas(false);
+      }
+    };
+    fetchFrotas();
+  }, []);
+
+  const handleNomeEmpresaChange = (val: string) => {
+    setNomeEmpresa(val);
+    localStorage.setItem('recuperar_nome_empresa', val);
+  };
+
   // Obter itens da lista de compras do localStorage para incluir no backup
   const obterItensShoppingList = () => {
     try {
@@ -222,7 +253,20 @@ export default function BackupView({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Nome da Empresa / Seu Nome</label>
+                <input
+                  type="text"
+                  maxLength={40}
+                  value={nomeEmpresa}
+                  onChange={(e) => handleNomeEmpresaChange(e.target.value)}
+                  placeholder="Ex: Transportadora FrigoSul"
+                  className="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 font-medium"
+                />
+                <p className="text-[10px] text-slate-500 mt-1">Identifica sua frota facilmente em caso de perda de cache do Chrome.</p>
+              </div>
+
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Código da sua Frota</label>
                 <div className="flex gap-2">
@@ -246,7 +290,7 @@ export default function BackupView({
                     Gerar
                   </button>
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">Insira um código personalizado (letras e números) para identificar seus dados de forma exclusiva.</p>
+                <p className="text-[10px] text-slate-500 mt-1">Insira um código para identificação exclusiva.</p>
               </div>
 
               <div className="flex flex-col justify-end">
@@ -264,6 +308,35 @@ export default function BackupView({
                 </label>
               </div>
             </div>
+
+            {frotasExistentes.length > 0 && (
+              <div className="border-t border-slate-800/85 pt-4 space-y-2">
+                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Frotas já Registradas na Nuvem:</label>
+                <div className="flex gap-2">
+                  <select
+                    onChange={(e) => {
+                      const selectedCode = e.target.value;
+                      if (selectedCode) {
+                        setCodigoFrota(selectedCode);
+                        const matched = frotasExistentes.find(f => f.codigo === selectedCode);
+                        if (matched && matched.nomeEmpresa) {
+                          handleNomeEmpresaChange(matched.nomeEmpresa);
+                        }
+                      }
+                    }}
+                    className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-sky-400 font-semibold focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 cursor-pointer"
+                  >
+                    <option value="">-- Selecione uma Frota Registrada na Nuvem para preencher os campos --</option>
+                    {frotasExistentes.filter(f => f.codigo !== '_REGISTRY').map((f) => (
+                      <option key={f.codigo} value={f.codigo}>
+                        {f.nomeEmpresa ? `${f.nomeEmpresa} [${f.codigo}]` : f.codigo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[10px] text-slate-500 font-medium">Selecione acima e clique no botão &quot;Recuperar Dados da Nuvem&quot; para restaurar.</p>
+              </div>
+            )}
 
             {/* Ações de sincronização */}
             <div className="flex flex-col sm:flex-row gap-2.5 pt-1">

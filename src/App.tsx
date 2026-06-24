@@ -404,6 +404,8 @@ export default function App() {
       shoppingList: safeGetLocalStorage('frigofrota_shopping_list', []),
       avarias: safeGetLocalStorage('frigofrota_avarias', {}),
       opcoesManutencao: safeGetLocalStorage('frigofrota_opcoes_manutencao', []),
+      nomeEmpresa: localStorage.getItem('recuperar_nome_empresa') || '',
+      updatedAt: new Date().toISOString()
     };
 
     try {
@@ -455,7 +457,11 @@ export default function App() {
 
       const data = await res.json();
       if (data.success && data.dados) {
-        const { veiculos, manutencoes, custoPadraoDiario, shoppingList, avarias, opcoesManutencao } = data.dados;
+        const { veiculos, manutencoes, custoPadraoDiario, shoppingList, avarias, opcoesManutencao, nomeEmpresa } = data.dados;
+
+        if (nomeEmpresa) {
+          localStorage.setItem('recuperar_nome_empresa', nomeEmpresa);
+        }
 
         if (veiculos) {
           setVeiculos(veiculos);
@@ -496,6 +502,12 @@ export default function App() {
 
   useEffect(() => {
     if (autoSync && codigoFrota) {
+      // Evita salvar automaticamente se a frota estiver totalmente vazia no início
+      // Isso protege contra sobregravação acidental do backup com dados vazios logo após limpar o cache
+      if (veiculos.length === 0 && manutencoes.length === 0) {
+        console.log('[AutoSync] Ignorado porque a frota está vazia. Protegendo backup na nuvem.');
+        return;
+      }
       const timer = setTimeout(() => {
         sincronizarComNuvem();
       }, 2000);

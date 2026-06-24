@@ -178,6 +178,33 @@ async function startServer() {
       const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
       fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
 
+      // Atualizar o registro central geral no Firestore para permitir recuperação fácil por lista
+      if (savedToCloud && safeCodigo !== "_REGISTRY") {
+        try {
+          const registry = await loadFromFirestoreREST("_REGISTRY") || { frotas: [] };
+          if (!registry.frotas) registry.frotas = [];
+          
+          const nomeEmpresa = dados.nomeEmpresa || "";
+          const existingIndex = registry.frotas.findIndex((f: any) => f.codigo === safeCodigo);
+          
+          const entry = {
+            codigo: safeCodigo,
+            nomeEmpresa: nomeEmpresa,
+            updatedAt: new Date().toISOString()
+          };
+          
+          if (existingIndex > -1) {
+            registry.frotas[existingIndex] = entry;
+          } else {
+            registry.frotas.push(entry);
+          }
+          
+          await saveToFirestoreREST("_REGISTRY", registry);
+        } catch (regErr) {
+          console.error("Erro ao atualizar registro geral de frotas:", regErr);
+        }
+      }
+
       // Salvar código ativo no servidor de forma persistente
       try {
         fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
@@ -199,6 +226,18 @@ async function startServer() {
     } catch (error: any) {
       console.error("Erro ao salvar sincronização:", error);
       res.status(500).json({ success: false, error: error.message || "Erro ao salvar dados no servidor." });
+    }
+  });
+
+  // Endpoint para obter a lista de todas as frotas registradas na nuvem
+  app.get("/api/sync/fleets", async (req, res) => {
+    try {
+      const registry = await loadFromFirestoreREST("_REGISTRY");
+      const frotas = registry && registry.frotas ? registry.frotas : [];
+      res.json({ success: true, frotas });
+    } catch (error: any) {
+      console.error("Erro ao carregar lista de frotas:", error);
+      res.status(500).json({ success: false, error: error.message || "Erro ao carregar lista de frotas." });
     }
   });
 

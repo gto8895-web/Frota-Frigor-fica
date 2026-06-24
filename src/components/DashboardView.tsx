@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Veiculo } from '../types';
 import { Truck, ShoppingBag, DollarSign, Edit2, Check, X, Database, Cloud, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 
@@ -32,6 +32,30 @@ export default function DashboardView({
   const [tempValue, setTempValue] = useState(custoPadraoDiario.toString());
   const [inputCodigo, setInputCodigo] = useState('');
   const [showRestoreWidget, setShowRestoreWidget] = useState(true);
+  const [frotasExistentes, setFrotasExistentes] = useState<{ codigo: string; nomeEmpresa: string; updatedAt?: string }[]>([]);
+  const [loadingFrotas, setLoadingFrotas] = useState(false);
+
+  useEffect(() => {
+    if (veiculos.length === 0) {
+      const fetchFrotas = async () => {
+        setLoadingFrotas(true);
+        try {
+          const res = await fetch('/api/sync/fleets');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.frotas) {
+              setFrotasExistentes(data.frotas);
+            }
+          }
+        } catch (e) {
+          console.error('Erro ao buscar frotas:', e);
+        } finally {
+          setLoadingFrotas(false);
+        }
+      };
+      fetchFrotas();
+    }
+  }, [veiculos]);
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) {
@@ -68,8 +92,8 @@ export default function DashboardView({
         </div>
       </div>
 
-      {/* Widget de Recuperação da Nuvem se o código local estiver vazio */}
-      {!codigoFrota && showRestoreWidget && (
+      {/* Widget de Recuperação da Nuvem se a frota estiver vazia */}
+      {veiculos.length === 0 && showRestoreWidget && (
         <div className="bg-[#020617] border border-sky-500/40 rounded-2xl p-5 shadow-lg relative overflow-hidden">
           <div className="absolute top-3 right-3">
             <button 
@@ -86,33 +110,57 @@ export default function DashboardView({
                 <Cloud className="w-5 h-5 animate-pulse" />
               </div>
               <div className="space-y-0.5">
-                <h3 className="font-display font-bold text-white text-sm">Seus dados já estão salvos na Nuvem!</h3>
+                <h3 className="font-display font-bold text-white text-sm">Sua frota sumiu ou limpou o cache do Chrome?</h3>
                 <p className="text-xs text-slate-350 leading-relaxed max-w-xl">
-                  Se você limpou o cache do Chrome ou está acessando de outro celular, digite o seu <strong className="text-sky-400">Código da sua Frota</strong> abaixo para recuperar todos os caminhões e manutenções na hora.
+                  Não se preocupe! Seus dados estão salvos com segurança na nuvem. Você pode selecionar a sua frota na lista abaixo para recuperar tudo instantaneamente com um clique.
                 </p>
               </div>
             </div>
-            <form onSubmit={handleRestoreFromDashboard} className="flex flex-col sm:flex-row gap-2 shrink-0 md:max-w-xs w-full">
-              <input
-                type="text"
-                value={inputCodigo}
-                onChange={(e) => setInputCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
-                placeholder="Ex: FROTA-ABC"
-                className="bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono font-bold text-sky-400 uppercase placeholder:text-slate-500 focus:outline-none focus:border-sky-400 w-full"
-                maxLength={15}
-              />
-              <button
-                type="submit"
-                disabled={syncStatus === 'syncing' || !inputCodigo.trim()}
-                className="bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
-              >
-                {syncStatus === 'syncing' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Cloud className="w-3.5 h-3.5" />
-                )}
-                Restaurar
-              </button>
+            
+            <form onSubmit={handleRestoreFromDashboard} className="flex flex-col gap-2.5 shrink-0 md:max-w-md w-full">
+              {frotasExistentes.length > 0 && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase">Frotas salvas na nuvem:</label>
+                  <select
+                    onChange={(e) => setInputCodigo(e.target.value)}
+                    value={inputCodigo}
+                    className="bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-sky-400 focus:outline-none focus:border-sky-400 w-full cursor-pointer"
+                  >
+                    <option value="">-- Escolha sua Empresa / Código --</option>
+                    {frotasExistentes.filter(f => f.codigo !== '_REGISTRY').map((f) => (
+                      <option key={f.codigo} value={f.codigo}>
+                        {f.nomeEmpresa ? `${f.nomeEmpresa} [${f.codigo}]` : f.codigo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <label className="text-[10px] font-semibold text-slate-400 uppercase mb-1 block">Ou digite o Código:</label>
+                  <input
+                    type="text"
+                    value={inputCodigo}
+                    onChange={(e) => setInputCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                    placeholder="Ex: FROTA-ABC"
+                    className="bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono font-bold text-sky-400 uppercase placeholder:text-slate-500 focus:outline-none focus:border-sky-400 w-full"
+                    maxLength={15}
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={syncStatus === 'syncing' || !inputCodigo.trim()}
+                  className="bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs px-4 py-2 h-[34px] rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+                >
+                  {syncStatus === 'syncing' ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Cloud className="w-3.5 h-3.5" />
+                  )}
+                  Recuperar
+                </button>
+              </div>
             </form>
           </div>
           {syncStatus === 'success' && (
