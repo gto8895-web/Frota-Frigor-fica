@@ -2,16 +2,18 @@ import React, { useState, useEffect } from 'react';
 import { Veiculo, StatusVeiculo, StatusRefrigeracao, Manutencao, Avaria } from '../types';
 import { Truck, Thermometer, Radio, Plus, X, Trash2, Edit3, Settings, Save, Sparkles, Filter, Wrench, AlertCircle, Calendar, ArrowLeft, CheckCircle2, AlertTriangle, ChevronRight, Camera, RefreshCw, VideoOff, Check } from 'lucide-react';
 
-// Helper component for Brand Logo using high-quality SVG inline
+// Helper component for Brand Logo using high-quality SVG/PNG inline
 export function LogoMarca({ marca, className = "w-5 h-5 flex-shrink-0" }: { marca: string; className?: string }) {
   const normalized = (marca || '').trim().toLowerCase();
 
   if (normalized.includes('volkswagen') || normalized.includes('vw')) {
     return (
-      <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="11" stroke="#3b82f6" strokeWidth="2" fill="white"/>
-        <path d="M6.5 7.5L10 16.5H11.5L15 7.5H13.5L11.5 13L9.5 7.5H8L10 13L12 7.5" fill="#1e3a8a" stroke="#1e3a8a" strokeWidth="0.5"/>
-        <path d="M8.5 7.5L11 14.5L12 12L13 14.5L15.5 7.5" stroke="#1e3a8a" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+      <svg className={className} viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="45" stroke="#0284c7" strokeWidth="8" fill="none" />
+        {/* V letter */}
+        <path d="M28 22 L45 54 L55 54 L72 22 L63 22 L50 47 L37 22 Z" fill="#0284c7" />
+        {/* W letter */}
+        <path d="M16 50 L33 83 L41 83 L50 65 L59 83 L67 83 L84 50 L75 50 L63 74 L51 50 L49 50 L37 74 L25 50 Z" fill="#0284c7" />
       </svg>
     );
   }
@@ -40,8 +42,54 @@ export function LogoMarca({ marca, className = "w-5 h-5 flex-shrink-0" }: { marc
   if (normalized.includes('mercedes')) {
     return (
       <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="12" cy="12" r="11" stroke="#94a3b8" strokeWidth="1.5" fill="none"/>
-        <path d="M12 2.5V12L4.5 16.5M12 12L19.5 16.5" stroke="#94a3b8" strokeWidth="1.5" strokeLinecap="round"/>
+        <defs>
+          <linearGradient id="mb-chrome-light" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#ffffff" />
+            <stop offset="50%" stopColor="#e2e8f0" />
+            <stop offset="100%" stopColor="#94a3b8" />
+          </linearGradient>
+          <linearGradient id="mb-chrome-dark" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#475569" />
+            <stop offset="50%" stopColor="#334155" />
+            <stop offset="100%" stopColor="#0f172a" />
+          </linearGradient>
+          <linearGradient id="mb-chrome-ring" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stopColor="#f8fafc" />
+            <stop offset="25%" stopColor="#94a3b8" />
+            <stop offset="50%" stopColor="#334155" />
+            <stop offset="75%" stopColor="#cbd5e1" />
+            <stop offset="100%" stopColor="#1e293b" />
+          </linearGradient>
+        </defs>
+
+        {/* Outer drop shadow circle */}
+        <circle cx="12" cy="12.3" r="11" fill="#000000" opacity="0.25" />
+
+        {/* Outer rim of the chrome circle */}
+        <circle cx="12" cy="12" r="11" stroke="url(#mb-chrome-ring)" strokeWidth="1.2" fill="none" />
+        
+        {/* Inner bevel of the chrome circle */}
+        <circle cx="12" cy="12" r="10.2" stroke="#ffffff" strokeWidth="0.4" fill="none" opacity="0.7" />
+        <circle cx="12" cy="12" r="9.6" stroke="#000000" strokeWidth="0.3" fill="none" opacity="0.3" />
+
+        {/* Star Facets */}
+        {/* Top point */}
+        <path d="M12 2.5 L12 12 L10.7 11.25 Z" fill="url(#mb-chrome-light)" />
+        <path d="M12 2.5 L12 12 L13.3 11.25 Z" fill="url(#mb-chrome-dark)" />
+
+        {/* Bottom Right point */}
+        <path d="M20.227 16.75 L12 12 L12 13.5 Z" fill="url(#mb-chrome-light)" />
+        <path d="M20.227 16.75 L12 12 L13.3 11.25 Z" fill="url(#mb-chrome-dark)" />
+
+        {/* Bottom Left point */}
+        <path d="M3.773 16.75 L12 12 L10.7 11.25 Z" fill="url(#mb-chrome-light)" />
+        <path d="M3.773 16.75 L12 12 L12 13.5 Z" fill="url(#mb-chrome-dark)" />
+
+        {/* Highlighting fine line on center borders */}
+        <path d="M12 2.5 L12 12 M20.227 16.75 L12 12 M3.773 16.75 L12 12" stroke="#ffffff" strokeWidth="0.15" opacity="0.6" />
+
+        {/* Micro center reflection */}
+        <circle cx="12" cy="12" r="0.4" fill="#ffffff" />
       </svg>
     );
   }

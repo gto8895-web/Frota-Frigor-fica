@@ -8,6 +8,8 @@ import BudgetView from './components/BudgetView';
 import ShoppingListView from './components/ShoppingListView';
 import BackupView from './components/BackupView';
 import { Truck, Wrench, DollarSign, LayoutDashboard, Settings, Radio, Download, Smartphone, Share, Info, X } from 'lucide-react';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
 export default function App() {
   // Estado de carregamento/inicialização inicial
@@ -480,17 +482,20 @@ export default function App() {
         const val = localStorage.getItem(key);
         return val ? JSON.parse(val) : fallback;
       } catch (e) {
-        console.warn(`Erro ao analisar a chave ${key} do localStorage:`, e);
         return fallback;
       }
     };
 
-    // Agrupar todos os dados locais para salvar de forma segura
-    const dados = {
+    const cleanCode = cod.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+
+    // Agrupar todos os dados locais usando EXACTAMENTE o mesmo formato do backup manual JSON
+    const dadosBackupCompleto = {
+      frigofrota_backup: true,
+      data_criacao: new Date().toISOString(),
       veiculos,
       manutencoes,
       custoPadraoDiario,
-      shoppingList: safeGetLocalStorage('frigofrota_shopping_list', []),
+      shopping_list: safeGetLocalStorage('frigofrota_shopping_list', []),
       avarias: safeGetLocalStorage('frigofrota_avarias', {}),
       opcoesManutencao: safeGetLocalStorage('frigofrota_opcoes_manutencao', []),
       nomeEmpresa: localStorage.getItem('recuperar_nome_empresa') || '',
@@ -498,31 +503,76 @@ export default function App() {
     };
 
     try {
-      const res = await fetch('/api/sync/save', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ codigoFrota: cod.trim().toUpperCase(), dados }),
+      // 1. Gravar os dados diretamente no Firestore no documento frotas/{cleanCode}
+      const docRef = doc(db, 'frotas', cleanCode);
+      await setDoc(docRef, {
+        dados: JSON.stringify(dadosBackupCompleto),
+        updatedAt: new Date().toISOString()
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Erro ao salvar dados na nuvem.');
+      // 2. Atualizar o registro central _REGISTRY no Firestore para que a frota apareça no dropdown
+      if (cleanCode !== '_REGISTRY') {
+        try {
+          const registryRef = doc(db, 'frotas', '_REGISTRY');
+          const registrySnap = await getDoc(registryRef);
+          let registryData = { frotas: [] as any[] };
+          if (registrySnap.exists()) {
+            const snapData = registrySnap.data();
+            if (snapData && snapData.dados) {
+              try {
+                registryData = JSON.parse(snapData.dados);
+              } catch {
+                registryData = { frotas: [] };
+              }
+            }
+          }
+          if (!registryData.frotas) registryData.frotas = [];
+
+          const nomeEmpresa = localStorage.getItem('recuperar_nome_empresa') || '';
+          const existingIndex = registryData.frotas.findIndex((f: any) => f.codigo === cleanCode);
+
+          const entry = {
+            codigo: cleanCode,
+            nomeEmpresa: nomeEmpresa,
+            updatedAt: new Date().toISOString()
+          };
+
+          if (existingIndex > -1) {
+            registryData.frotas[existingIndex] = entry;
+          } else {
+            registryData.frotas.push(entry);
+          }
+
+          await setDoc(registryRef, {
+            dados: JSON.stringify(registryData),
+            updatedAt: new Date().toISOString()
+          });
+        } catch (regErr) {
+          console.error("Erro secundário ao registrar no _REGISTRY da nuvem:", regErr);
+        }
       }
 
-      const data = await res.json();
-      if (!data.success) {
-        throw new Error(data.error || 'Erro ao salvar dados na nuvem.');
+      // 3. Fazer chamada de redundância ao servidor local Express (caso queira manter cache no disco local)
+      try {
+        await fetch('/api/sync/save', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ codigoFrota: cleanCode, dados: dadosBackupCompleto }),
+        });
+      } catch (srvErr) {
+        // Ignoramos erros do servidor local pois o salvamento principal na nuvem direta funcionou!
+        console.warn("Salvamento redundante no servidor Express falhou:", srvErr);
       }
 
       setSyncStatus('success');
-      localStorage.setItem('recuperar_codigo_frota', cod.trim().toUpperCase());
+      localStorage.setItem('recuperar_codigo_frota', cleanCode);
       setTimeout(() => setSyncStatus('idle'), 3000);
     } catch (err: any) {
-      console.error(err);
+      console.error("Erro na sincronização direta com Firestore:", err);
       setSyncStatus('error');
-      setSyncError(err.message || 'Falha na conexão com o servidor de sincronização.');
+      setSyncError(err.message || 'Falha ao conectar com o banco na nuvem.');
     }
   };
 
@@ -535,54 +585,78 @@ export default function App() {
     setSyncStatus('syncing');
     setSyncError(null);
 
+    const cleanCode = codigoInput.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+
     try {
-      const res = await fetch(`/api/sync/load/${codigoInput.trim().toUpperCase()}`);
-      if (!res.ok) {
-        if (res.status === 404) {
-          throw new Error('Código de frota não localizado na nuvem. Verifique a grafia.');
-        }
-        throw new Error('Erro ao baixar os dados.');
+      // 1. Carregar diretamente do Firestore via SDK do Cliente
+      const docRef = doc(db, 'frotas', cleanCode);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        throw new Error('Código de frota não localizado na nuvem. Verifique a grafia.');
       }
 
-      const data = await res.json();
-      if (data.success && data.dados) {
-        const { veiculos, manutencoes, custoPadraoDiario, shoppingList, avarias, opcoesManutencao, nomeEmpresa } = data.dados;
-
-        if (nomeEmpresa) {
-          localStorage.setItem('recuperar_nome_empresa', nomeEmpresa);
-        }
-
-        if (veiculos) {
-          setVeiculos(veiculos);
-          localStorage.setItem('ff_veiculos', JSON.stringify(veiculos));
-        }
-        if (manutencoes) {
-          setManutencoes(manutencoes);
-          localStorage.setItem('ff_manutencoes', JSON.stringify(manutencoes));
-        }
-        if (custoPadraoDiario) {
-          setCustoPadraoDiario(custoPadraoDiario);
-          localStorage.setItem('ff_custo_diario', String(custoPadraoDiario));
-        }
-        if (shoppingList) {
-          localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
-        }
-        if (avarias) {
-          localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
-        }
-        if (opcoesManutencao) {
-          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
-        }
-
-        setCodigoFrota(codigoInput.trim().toUpperCase());
-        localStorage.setItem('recuperar_codigo_frota', codigoInput.trim().toUpperCase());
-        setSyncStatus('success');
-        alert('Dados da Frota RECUPERADOS e sincronizados com sucesso!');
-        setTimeout(() => setSyncStatus('idle'), 3000);
-        window.location.reload();
+      const docData = docSnap.data();
+      if (!docData || !docData.dados) {
+        throw new Error('Nenhum dado válido localizado para esta frota na nuvem.');
       }
+
+      // Decodificar dados exatamente como no backup manual
+      const parsed = JSON.parse(docData.dados);
+
+      // Validação idêntica à do import manual
+      if (
+        !parsed || 
+        typeof parsed !== 'object' || 
+        !Array.isArray(parsed.veiculos) || 
+        !Array.isArray(parsed.manutencoes)
+      ) {
+        throw new Error('Dados da nuvem inválidos ou incompatíveis.');
+      }
+
+      // 2. Restaurar tudo localmente exatamente como no import manual!
+      if (parsed.nomeEmpresa) {
+        localStorage.setItem('recuperar_nome_empresa', parsed.nomeEmpresa);
+      }
+
+      setVeiculos(parsed.veiculos);
+      localStorage.setItem('ff_veiculos', JSON.stringify(parsed.veiculos));
+
+      setManutencoes(parsed.manutencoes);
+      localStorage.setItem('ff_manutencoes', JSON.stringify(parsed.manutencoes));
+
+      const custo = parsed.custoPadraoDiario || 150;
+      setCustoPadraoDiario(custo);
+      localStorage.setItem('ff_custo_diario', String(custo));
+
+      // Importar lista de compras (tratando both keys 'shopping_list' e 'shoppingList' para total retrocompatibilidade)
+      const listToSave = parsed.shopping_list || parsed.shoppingList || [];
+      localStorage.setItem('frigofrota_shopping_list', JSON.stringify(listToSave));
+
+      if (parsed.avarias) {
+        localStorage.setItem('frigofrota_avarias', JSON.stringify(parsed.avarias));
+      }
+
+      if (parsed.opcoesManutencao) {
+        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(parsed.opcoesManutencao));
+      }
+
+      setCodigoFrota(cleanCode);
+      localStorage.setItem('recuperar_codigo_frota', cleanCode);
+
+      // Notificar o servidor Express do código ativo atual de forma síncrona/segura
+      try {
+        await fetch(`/api/sync/load/${cleanCode}`).catch(() => {});
+      } catch (srvErr) {
+        console.warn("Falha ao registrar código ativo no Express:", srvErr);
+      }
+
+      setSyncStatus('success');
+      alert('Dados da Frota RECUPERADOS e sincronizados com a nuvem com sucesso!');
+      setTimeout(() => setSyncStatus('idle'), 3000);
+      window.location.reload();
     } catch (err: any) {
-      console.error(err);
+      console.error("Erro ao carregar do Firestore:", err);
       setSyncStatus('error');
       setSyncError(err.message || 'Falha de conexão ou código incorreto.');
       alert(err.message || 'Código de frota não encontrado.');
@@ -632,51 +706,77 @@ export default function App() {
             const serverCode = data.codigoFrota;
             console.log('[Init] Código ativo recuperado do servidor:', serverCode);
 
-            // Carregar os dados correspondentes e completos do Firestore de forma síncrona/bloqueante na inicialização
-            const loadRes = await fetch(`/api/sync/load/${serverCode}`);
-            if (loadRes.ok) {
-              const loadData = await loadRes.json();
-              if (loadData.success && loadData.dados) {
-                const { 
-                  veiculos: cloudVeic, 
-                  manutencoes: cloudMaint, 
-                  custoPadraoDiario: cloudCusto, 
-                  shoppingList, 
-                  avarias, 
-                  opcoesManutencao 
-                } = loadData.dados;
-
-                if (cloudVeic) {
-                  setVeiculos(cloudVeic);
-                  localStorage.setItem('ff_veiculos', JSON.stringify(cloudVeic));
+            // Tenta carregar diretamente do Firestore via SDK do cliente primeiro
+            let parsedData: any = null;
+            try {
+              const docRef = doc(db, 'frotas', serverCode);
+              const docSnap = await getDoc(docRef);
+              if (docSnap.exists()) {
+                const docData = docSnap.data();
+                if (docData && docData.dados) {
+                  parsedData = JSON.parse(docData.dados);
+                  console.log('[Init] Dados carregados diretamente da Nuvem (Firestore SDK).');
                 }
-                if (cloudMaint) {
-                  setManutencoes(cloudMaint);
-                  localStorage.setItem('ff_manutencoes', JSON.stringify(cloudMaint));
-                }
-                if (cloudCusto) {
-                  setCustoPadraoDiario(cloudCusto);
-                  localStorage.setItem('ff_custo_diario', String(cloudCusto));
-                }
-                if (shoppingList) {
-                  localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
-                }
-                if (avarias) {
-                  localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
-                }
-                if (opcoesManutencao) {
-                  localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
-                }
-
-                setCodigoFrota(serverCode);
-                localStorage.setItem('recuperar_codigo_frota', serverCode);
-                setAutoSync(true);
-                localStorage.setItem('recuperar_auto_sync', 'true');
-                
-                console.log('[Init] Sucesso: Todos os dados da frota foram recuperados da nuvem e restaurados!');
-                setIsInitializing(false);
-                return;
               }
+            } catch (fsErr) {
+              console.warn('[Init] Falha ao ler diretamente do Firestore SDK, tentando API de fallback...', fsErr);
+            }
+
+            // Se falhou por SDK do cliente, tenta o fallback da API express do servidor
+            if (!parsedData) {
+              try {
+                const loadRes = await fetch(`/api/sync/load/${serverCode}`);
+                if (loadRes.ok) {
+                  const loadData = await loadRes.json();
+                  if (loadData.success && loadData.dados) {
+                    parsedData = loadData.dados;
+                    console.log('[Init] Dados carregados via API de fallback do servidor.');
+                  }
+                }
+              } catch (apiErr) {
+                console.error('[Init] Falha total ao carregar dados do servidor:', apiErr);
+              }
+            }
+
+            // Se conseguimos recuperar os dados de alguma das fontes, restauramos!
+            if (parsedData) {
+              const cloudVeic = parsedData.veiculos;
+              const cloudMaint = parsedData.manutencoes;
+              const cloudCusto = parsedData.custoPadraoDiario;
+              const shoppingList = parsedData.shopping_list || parsedData.shoppingList;
+              const avarias = parsedData.avarias;
+              const opcoesManutencao = parsedData.opcoesManutencao;
+
+              if (cloudVeic) {
+                setVeiculos(cloudVeic);
+                localStorage.setItem('ff_veiculos', JSON.stringify(cloudVeic));
+              }
+              if (cloudMaint) {
+                setManutencoes(cloudMaint);
+                localStorage.setItem('ff_manutencoes', JSON.stringify(cloudMaint));
+              }
+              if (cloudCusto) {
+                setCustoPadraoDiario(cloudCusto);
+                localStorage.setItem('ff_custo_diario', String(cloudCusto));
+              }
+              if (shoppingList) {
+                localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
+              }
+              if (avarias) {
+                localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
+              }
+              if (opcoesManutencao) {
+                localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
+              }
+
+              setCodigoFrota(serverCode);
+              localStorage.setItem('recuperar_codigo_frota', serverCode);
+              setAutoSync(true);
+              localStorage.setItem('recuperar_auto_sync', 'true');
+              
+              console.log('[Init] Sucesso: Todos os dados da frota foram recuperados e restaurados!');
+              setIsInitializing(false);
+              return;
             }
           }
         }

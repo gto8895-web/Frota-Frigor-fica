@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { Database, ArrowLeft, Download, Upload, CheckCircle, AlertTriangle, FileJson, Clock, RefreshCw, Cloud, CloudLightning, ShieldCheck, Wifi, HelpCircle } from 'lucide-react';
 import { Veiculo, Manutencao } from '../types';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface BackupViewProps {
   veiculos: Veiculo[];
@@ -165,15 +167,47 @@ export default function BackupView({
     const fetchFrotas = async () => {
       setLoadingFrotas(true);
       try {
-        const res = await fetch('/api/sync/fleets');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.frotas) {
-            setFrotasExistentes(data.frotas);
+        // Tenta buscar diretamente do Firestore via SDK do cliente
+        let frotas: any[] = [];
+        let loadedDirectly = false;
+
+        try {
+          const registryRef = doc(db, 'frotas', '_REGISTRY');
+          const registrySnap = await getDoc(registryRef);
+          if (registrySnap.exists()) {
+            const data = registrySnap.data();
+            if (data && data.dados) {
+              const registryData = JSON.parse(data.dados);
+              if (registryData && Array.isArray(registryData.frotas)) {
+                frotas = registryData.frotas;
+                loadedDirectly = true;
+                console.log('Lista de frotas carregada diretamente do Firestore SDK.');
+              }
+            }
+          }
+        } catch (fsErr) {
+          console.warn('Falha ao obter frotas via Firestore SDK, tentando API de fallback...', fsErr);
+        }
+
+        // Se falhou por SDK do cliente, tenta a API Express
+        if (!loadedDirectly) {
+          try {
+            const res = await fetch('/api/sync/fleets');
+            if (res.ok) {
+              const data = await res.json();
+              if (data.success && data.frotas) {
+                frotas = data.frotas;
+                console.log('Lista de frotas carregada via API de fallback Express.');
+              }
+            }
+          } catch (apiErr) {
+            console.error('Falha total ao buscar frotas:', apiErr);
           }
         }
+
+        setFrotasExistentes(frotas);
       } catch (e) {
-        console.error('Erro ao buscar frotas:', e);
+        console.error('Erro geral ao buscar frotas:', e);
       } finally {
         setLoadingFrotas(false);
       }

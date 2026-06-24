@@ -175,8 +175,12 @@ async function startServer() {
       const savedToCloud = await saveToFirestoreREST(safeCodigo, dados);
 
       // Sempre grava localmente também para redundância e cache local
-      const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
+      try {
+        const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
+        fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
+      } catch (cacheErr) {
+        console.warn("Aviso: Falha ao gravar cache local no servidor:", cacheErr);
+      }
 
       // Atualizar o registro central geral no Firestore para permitir recuperação fácil por lista
       if (savedToCloud && safeCodigo !== "_REGISTRY") {
