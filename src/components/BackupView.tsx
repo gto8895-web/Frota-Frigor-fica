@@ -98,17 +98,20 @@ export default function BackupView({
         shopping_list: shoppingList
       };
 
-      const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-        JSON.stringify(backupData, null, 2)
-      )}`;
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
       
       const downloadAnchor = document.createElement('a');
       const dataIso = new Date().toISOString().slice(0, 10);
-      downloadAnchor.setAttribute('href', jsonString);
+      downloadAnchor.setAttribute('href', blobUrl);
       downloadAnchor.setAttribute('download', `frigofrota_backup_${dataIso}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
-      downloadAnchor.remove();
+      
+      // Cleanup
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(blobUrl);
 
       setStatusMessage({
         text: 'Backup exportado com sucesso! Salve o arquivo gerado em um local seguro.',
@@ -125,6 +128,7 @@ export default function BackupView({
 
   const handleImportClick = () => {
     if (fileInputRef.current) {
+      fileInputRef.current.value = ''; // limpa valor anterior
       fileInputRef.current.click();
     }
   };
@@ -437,13 +441,14 @@ export default function BackupView({
               </div>
             </button>
 
-            {/* Input File oculto para carregar JSON */}
+            {/* Input File off-screen altamente compatível com todos os celulares e navegadores */}
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
-              accept=".json"
-              className="hidden"
+              accept=".json,application/json,text/plain"
+              className="absolute pointer-events-none opacity-0"
+              style={{ width: 1, height: 1, top: 0, left: 0 }}
             />
           </div>
 

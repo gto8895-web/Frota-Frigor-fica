@@ -10,31 +10,20 @@ import BackupView from './components/BackupView';
 import { Truck, Wrench, DollarSign, LayoutDashboard, Settings, Radio, Download, Smartphone, Share, Info, X } from 'lucide-react';
 
 export default function App() {
+  // Estado de carregamento/inicialização inicial
+  const [isInitializing, setIsInitializing] = useState(true);
+
   // Inicialização de estados reativos persistidos ou fallback de mock-data
   const [veiculos, setVeiculos] = useState<Veiculo[]>(() => {
     const salvos = localStorage.getItem('ff_veiculos');
     if (salvos) {
       try {
-        const parsed = JSON.parse(salvos) as Veiculo[];
-        // Remove os veículos de teste criados anteriormente (ex: FRG-2B45, COL-7E89, etc)
-        const hasOldTestVehicles = parsed.some(v => 
-          v.placa === 'FRG-2B45' || 
-          v.placa === 'COL-7E89' || 
-          v.placa === 'ICE-4D12' || 
-          v.placa === 'SNW-9A34' || 
-          v.placa === 'GLC-1F78'
-        );
-        // Se houver algum veículo antigo de teste ou a lista estiver vazia/desatualizada
-        if (hasOldTestVehicles) {
-          localStorage.setItem('ff_veiculos', JSON.stringify(INITIAL_VEHICLES));
-          return INITIAL_VEHICLES;
-        }
-        return parsed;
+        return JSON.parse(salvos) as Veiculo[];
       } catch (e) {
-        return INITIAL_VEHICLES;
+        return [];
       }
     }
-    return INITIAL_VEHICLES;
+    return [];
   });
 
   const [manutencoes, setManutencoes] = useState<Manutencao[]>(() => {
@@ -42,26 +31,18 @@ export default function App() {
     if (salvos) {
       try {
         const parsed = JSON.parse(salvos) as Manutencao[];
-        let modified = false;
-        const migrated = parsed.map(m => {
-          // Se uma manutenção foi salva anteriormente com custo 350 (devido ao antigo valor fixado no código),
-          // ela é restaurada para o valor histórico de 150 reais para não distorcer o registro.
+        return parsed.map(m => {
+          // Se uma manutenção foi salva anteriormente com custo 350, restaura para 150
           if (m.custo === 350) {
-            modified = true;
             return { ...m, custo: 150 };
           }
           return m;
         });
-        if (modified) {
-          localStorage.setItem('ff_manutencoes', JSON.stringify(migrated));
-          return migrated;
-        }
-        return parsed;
       } catch (e) {
-        return INITIAL_MAINTENANCES;
+        return [];
       }
     }
-    return INITIAL_MAINTENANCES;
+    return [];
   });
 
   const [custoPadraoDiario, setCustoPadraoDiario] = useState<number>(() => {
@@ -90,27 +71,13 @@ export default function App() {
   
   // Sincronização em nuvem (RECUPERAR)
   const [codigoFrota, setCodigoFrota] = useState<string>(() => {
-    let saved = localStorage.getItem('recuperar_codigo_frota');
-    if (!saved) {
-      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-      let randomId = '';
-      for (let i = 0; i < 6; i++) {
-        randomId += chars.charAt(Math.floor(Math.random() * chars.length));
-      }
-      saved = `FRIGO-${randomId}`;
-      localStorage.setItem('recuperar_codigo_frota', saved);
-    }
-    return saved;
+    return localStorage.getItem('recuperar_codigo_frota') || '';
   });
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autoSync, setAutoSync] = useState<boolean>(() => {
     const saved = localStorage.getItem('recuperar_auto_sync');
-    if (saved === null) {
-      localStorage.setItem('recuperar_auto_sync', 'true');
-      return true; // Sincronização automática ativa por padrão
-    }
-    return saved === 'true';
+    return saved !== 'false'; // Sincronização automática ativa por padrão
   });
 
   const [currentTime, setCurrentTime] = useState<string>(() => {
@@ -193,16 +160,19 @@ export default function App() {
 
   // Sincronizar estados com o LocalStorage
   useEffect(() => {
+    if (isInitializing) return;
     localStorage.setItem('ff_veiculos', JSON.stringify(veiculos));
-  }, [veiculos]);
+  }, [veiculos, isInitializing]);
 
   useEffect(() => {
+    if (isInitializing) return;
     localStorage.setItem('ff_manutencoes', JSON.stringify(manutencoes));
-  }, [manutencoes]);
+  }, [manutencoes, isInitializing]);
 
   useEffect(() => {
+    if (isInitializing) return;
     localStorage.setItem('ff_custo_diario', custoPadraoDiario.toString());
-  }, [custoPadraoDiario]);
+  }, [custoPadraoDiario, isInitializing]);
 
   // AÇÕES - GERENCIAMENTO DE VEÍCULOS
   const handleAddVehicle = (novoVeic: Omit<Veiculo, 'id'>) => {
@@ -501,9 +471,9 @@ export default function App() {
   };
 
   useEffect(() => {
+    if (isInitializing) return;
     if (autoSync && codigoFrota) {
       // Evita salvar automaticamente se a frota estiver totalmente vazia no início
-      // Isso protege contra sobregravação acidental do backup com dados vazios logo após limpar o cache
       if (veiculos.length === 0 && manutencoes.length === 0) {
         console.log('[AutoSync] Ignorado porque a frota está vazia. Protegendo backup na nuvem.');
         return;
@@ -513,76 +483,142 @@ export default function App() {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [veiculos, manutencoes, custoPadraoDiario, autoSync, codigoFrota]);
+  }, [veiculos, manutencoes, custoPadraoDiario, autoSync, codigoFrota, isInitializing]);
 
   useEffect(() => {
+    if (isInitializing) return;
     localStorage.setItem('recuperar_auto_sync', String(autoSync));
-  }, [autoSync]);
+  }, [autoSync, isInitializing]);
 
-  // Recuperação Automática de Dados se o cache do Chrome/LocalStorage for limpo
+  // Inicialização Única de Recuperação/Configuração ao Carregar o App
   useEffect(() => {
-    const autoRecuperarDados = async () => {
+    const inicializarApp = async () => {
       try {
         const localCode = localStorage.getItem('recuperar_codigo_frota');
-        const hasLocalVehicles = localStorage.getItem('ff_veiculos');
-        
-        // Se o localCode estiver vazio ou não houver veículos salvos no localStorage (indicando limpeza de dados)
-        if (!localCode || !hasLocalVehicles) {
-          console.log('[RECUPERAR] Tentando obter o código ativo do servidor...');
-          const res = await fetch('/api/sync/active-code');
-          if (res.ok) {
-            const data = await res.json();
-            if (data.success && data.codigoFrota) {
-              const serverCode = data.codigoFrota;
-              console.log('[RECUPERAR] Código ativo encontrado no servidor:', serverCode);
-              
-              // Carregar os dados correspondentes silenciosamente do servidor / Firestore
-              const loadRes = await fetch(`/api/sync/load/${serverCode}`);
-              if (loadRes.ok) {
-                const loadData = await loadRes.json();
-                if (loadData.success && loadData.dados) {
-                  const { veiculos: cloudVeic, manutencoes: cloudMaint, custoPadraoDiario: cloudCusto, shoppingList, avarias, opcoesManutencao } = loadData.dados;
-                  
-                  if (cloudVeic) {
-                    setVeiculos(cloudVeic);
-                    localStorage.setItem('ff_veiculos', JSON.stringify(cloudVeic));
-                  }
-                  if (cloudMaint) {
-                    setManutencoes(cloudMaint);
-                    localStorage.setItem('ff_manutencoes', JSON.stringify(cloudMaint));
-                  }
-                  if (cloudCusto) {
-                    setCustoPadraoDiario(cloudCusto);
-                    localStorage.setItem('ff_custo_diario', String(cloudCusto));
-                  }
-                  if (shoppingList) {
-                    localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
-                  }
-                  if (avarias) {
-                    localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
-                  }
-                  if (opcoesManutencao) {
-                    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
-                  }
-                  
-                  setCodigoFrota(serverCode);
-                  localStorage.setItem('recuperar_codigo_frota', serverCode);
-                  setAutoSync(true);
-                  localStorage.setItem('recuperar_auto_sync', 'true');
-                  
-                  console.log('[RECUPERAR] Sucesso: Dados restaurados de forma totalmente transparente e automática!');
+        const localVeiculos = localStorage.getItem('ff_veiculos');
+
+        // Se já temos dados locais em localStorage, prosseguir imediatamente
+        if (localCode && localVeiculos) {
+          console.log('[Init] Dados locais encontrados no LocalStorage.');
+          setIsInitializing(false);
+          return;
+        }
+
+        // Caso contrário, significa que é o primeiro acesso ou o usuário limpou o cache do navegador
+        console.log('[Init] LocalStorage não localizado. Buscando código ativo no servidor...');
+        const res = await fetch('/api/sync/active-code');
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.codigoFrota) {
+            const serverCode = data.codigoFrota;
+            console.log('[Init] Código ativo recuperado do servidor:', serverCode);
+
+            // Carregar os dados correspondentes e completos do Firestore de forma síncrona/bloqueante na inicialização
+            const loadRes = await fetch(`/api/sync/load/${serverCode}`);
+            if (loadRes.ok) {
+              const loadData = await loadRes.json();
+              if (loadData.success && loadData.dados) {
+                const { 
+                  veiculos: cloudVeic, 
+                  manutencoes: cloudMaint, 
+                  custoPadraoDiario: cloudCusto, 
+                  shoppingList, 
+                  avarias, 
+                  opcoesManutencao 
+                } = loadData.dados;
+
+                if (cloudVeic) {
+                  setVeiculos(cloudVeic);
+                  localStorage.setItem('ff_veiculos', JSON.stringify(cloudVeic));
                 }
+                if (cloudMaint) {
+                  setManutencoes(cloudMaint);
+                  localStorage.setItem('ff_manutencoes', JSON.stringify(cloudMaint));
+                }
+                if (cloudCusto) {
+                  setCustoPadraoDiario(cloudCusto);
+                  localStorage.setItem('ff_custo_diario', String(cloudCusto));
+                }
+                if (shoppingList) {
+                  localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
+                }
+                if (avarias) {
+                  localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
+                }
+                if (opcoesManutencao) {
+                  localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
+                }
+
+                setCodigoFrota(serverCode);
+                localStorage.setItem('recuperar_codigo_frota', serverCode);
+                setAutoSync(true);
+                localStorage.setItem('recuperar_auto_sync', 'true');
+                
+                console.log('[Init] Sucesso: Todos os dados da frota foram recuperados da nuvem e restaurados!');
+                setIsInitializing(false);
+                return;
               }
             }
           }
         }
+
+        // Se não houver código ativo no servidor ou falhar o carregamento, é um primeiro acesso limpo absoluto
+        console.log('[Init] Nenhum dado prévio em nuvem. Carregando dados padrão (Mocks)...');
+        const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        let randomId = '';
+        for (let i = 0; i < 6; i++) {
+          randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+        }
+        const novoCodigo = `FRIGO-${randomId}`;
+
+        setCodigoFrota(novoCodigo);
+        localStorage.setItem('recuperar_codigo_frota', novoCodigo);
+
+        setVeiculos(INITIAL_VEHICLES);
+        setManutencoes(INITIAL_MAINTENANCES);
+        setCustoPadraoDiario(150);
+
+        localStorage.setItem('ff_veiculos', JSON.stringify(INITIAL_VEHICLES));
+        localStorage.setItem('ff_manutencoes', JSON.stringify(INITIAL_MAINTENANCES));
+        localStorage.setItem('ff_custo_diario', '150');
+        localStorage.setItem('recuperar_auto_sync', 'true');
+        setAutoSync(true);
+
       } catch (err) {
-        console.error('[RECUPERAR] Erro na recuperação automática de dados:', err);
+        console.error('[Init] Erro crítico ao inicializar aplicativo:', err);
+        // Fallback seguro em caso de erro extremo
+        setVeiculos(INITIAL_VEHICLES);
+        setManutencoes(INITIAL_MAINTENANCES);
+        setCustoPadraoDiario(150);
+      } finally {
+        setIsInitializing(false);
       }
     };
-    
-    autoRecuperarDados();
+
+    inicializarApp();
   }, []);
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col items-center justify-center p-4 animate-fade-in">
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center">
+          <div className="relative">
+            <div className="p-4 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-2xl animate-pulse">
+              <Truck className="w-10 h-10" />
+            </div>
+          </div>
+          <h2 className="text-lg font-bold font-display text-white">Frigofrota Cloud</h2>
+          <p className="text-xs text-slate-400 leading-relaxed">
+            Sincronizando com a nuvem e restabelecendo seu painel administrativo seguro...
+          </p>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="w-2 h-2 rounded-full bg-sky-400 animate-ping"></span>
+            <span className="text-[11px] text-slate-500 font-mono">Conectando ao Firestore</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col justify-between">
