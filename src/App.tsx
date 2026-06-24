@@ -90,12 +90,27 @@ export default function App() {
   
   // Sincronização em nuvem (RECUPERAR)
   const [codigoFrota, setCodigoFrota] = useState<string>(() => {
-    return localStorage.getItem('recuperar_codigo_frota') || '';
+    let saved = localStorage.getItem('recuperar_codigo_frota');
+    if (!saved) {
+      const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      let randomId = '';
+      for (let i = 0; i < 6; i++) {
+        randomId += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+      saved = `FRIGO-${randomId}`;
+      localStorage.setItem('recuperar_codigo_frota', saved);
+    }
+    return saved;
   });
   const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'success' | 'error'>('idle');
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autoSync, setAutoSync] = useState<boolean>(() => {
-    return localStorage.getItem('recuperar_auto_sync') === 'true';
+    const saved = localStorage.getItem('recuperar_auto_sync');
+    if (saved === null) {
+      localStorage.setItem('recuperar_auto_sync', 'true');
+      return true; // Sincronização automática ativa por padrão
+    }
+    return saved === 'true';
   });
 
   const [currentTime, setCurrentTime] = useState<string>(() => {
@@ -486,7 +501,7 @@ export default function App() {
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [veiculos, manutencoes, autoSync, codigoFrota]);
+  }, [veiculos, manutencoes, custoPadraoDiario, autoSync, codigoFrota]);
 
   useEffect(() => {
     localStorage.setItem('recuperar_auto_sync', String(autoSync));
