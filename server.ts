@@ -13,12 +13,25 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+// Persistent Debug Logging Helper
+function logDebug(message: string) {
+  const logPath = path.join(DATA_DIR, "sync_debug.log");
+  const timestamp = new Date().toISOString();
+  try {
+    fs.appendFileSync(logPath, `[${timestamp}] ${message}\n`, "utf8");
+    console.log(`[DEBUG] ${message}`);
+  } catch (err) {
+    console.error("Failed to write to sync_debug.log:", err);
+  }
+}
+
 // Helper to write to Firestore via REST API
 async function saveToFirestoreREST(codigo: string, dados: any): Promise<boolean> {
   try {
+    logDebug(`Iniciando salvamento no Firestore via REST para: ${codigo}. Tamanho do payload: ${JSON.stringify(dados).length} caracteres.`);
     const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (!fs.existsSync(firebaseConfigPath)) {
-      console.warn("[Firestore REST API] firebase-applet-config.json não localizado.");
+      logDebug("[Firestore REST API] firebase-applet-config.json não localizado.");
       return false;
     }
     
@@ -47,14 +60,14 @@ async function saveToFirestoreREST(codigo: string, dados: any): Promise<boolean>
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[Firestore REST API] Falha ao salvar para ${codigo}. Status: ${res.status}, Erro:`, errText);
+      logDebug(`[Firestore REST API] Falha ao salvar para ${codigo}. Status HTTP: ${res.status}, Erro: ${errText}`);
       return false;
     }
 
-    console.log(`[Firestore REST API] Sincronização gravada com sucesso para: ${codigo}`);
+    logDebug(`[Firestore REST API] Sincronização gravada com sucesso para: ${codigo}`);
     return true;
-  } catch (error) {
-    console.error("[Firestore REST API] Erro na requisição de salvamento:", error);
+  } catch (error: any) {
+    logDebug(`[Firestore REST API] Erro na requisição de salvamento para ${codigo}: ${error.stack || error}`);
     return false;
   }
 }
@@ -62,9 +75,10 @@ async function saveToFirestoreREST(codigo: string, dados: any): Promise<boolean>
 // Helper to read from Firestore via REST API
 async function loadFromFirestoreREST(codigo: string): Promise<any | null> {
   try {
+    logDebug(`Iniciando carregamento do Firestore via REST para: ${codigo}`);
     const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
     if (!fs.existsSync(firebaseConfigPath)) {
-      console.warn("[Firestore REST API] firebase-applet-config.json não localizado.");
+      logDebug("[Firestore REST API] firebase-applet-config.json não localizado.");
       return null;
     }
     
@@ -79,25 +93,26 @@ async function loadFromFirestoreREST(codigo: string): Promise<any | null> {
     });
 
     if (res.status === 404) {
-      console.log(`[Firestore REST API] Código ${codigo} não localizado (404).`);
+      logDebug(`[Firestore REST API] Código ${codigo} não localizado (404).`);
       return null;
     }
 
     if (!res.ok) {
       const errText = await res.text();
-      console.error(`[Firestore REST API] Falha ao ler de ${codigo}. Status: ${res.status}, Erro:`, errText);
+      logDebug(`[Firestore REST API] Falha ao ler de ${codigo}. Status HTTP: ${res.status}, Erro: ${errText}`);
       return null;
     }
 
     const docData = await res.json();
     if (docData && docData.fields && docData.fields.dados && docData.fields.dados.stringValue) {
-      console.log(`[Firestore REST API] Dados carregados com sucesso para a frota: ${codigo}`);
+      logDebug(`[Firestore REST API] Dados carregados com sucesso para a frota: ${codigo}`);
       return JSON.parse(docData.fields.dados.stringValue);
     }
     
+    logDebug(`[Firestore REST API] Documento para ${codigo} localizado, mas campos 'dados' ou 'stringValue' estão ausentes.`);
     return null;
-  } catch (error) {
-    console.error("[Firestore REST API] Erro na requisição de carregamento:", error);
+  } catch (error: any) {
+    logDebug(`[Firestore REST API] Erro na requisição de carregamento para ${codigo}: ${error.stack || error}`);
     return null;
   }
 }
@@ -170,11 +185,16 @@ async function startServer() {
         console.error("Erro ao salvar active_code.txt:", err);
       }
 
+      if (!savedToCloud) {
+        return res.status(500).json({
+          success: false,
+          error: "Falha ao gravar os dados na nuvem (Firestore). Por favor, verifique a chave de API ou se os dados estão corretos."
+        });
+      }
+
       res.json({ 
         success: true, 
-        message: savedToCloud 
-          ? "Dados sincronizados com a nuvem (Firestore) com sucesso!" 
-          : "Dados salvos localmente no servidor (fallback offline)." 
+        message: "Dados sincronizados com a nuvem (Firestore) com sucesso!"
       });
     } catch (error: any) {
       console.error("Erro ao salvar sincronização:", error);

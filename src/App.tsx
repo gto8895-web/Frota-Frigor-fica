@@ -370,14 +370,25 @@ export default function App() {
     setSyncStatus('syncing');
     setSyncError(null);
 
-    // Agrupar todos os dados locais para salvar
+    // Helper para leitura segura do localStorage
+    const safeGetLocalStorage = (key: string, fallback: any) => {
+      try {
+        const val = localStorage.getItem(key);
+        return val ? JSON.parse(val) : fallback;
+      } catch (e) {
+        console.warn(`Erro ao analisar a chave ${key} do localStorage:`, e);
+        return fallback;
+      }
+    };
+
+    // Agrupar todos os dados locais para salvar de forma segura
     const dados = {
       veiculos,
       manutencoes,
       custoPadraoDiario,
-      shoppingList: JSON.parse(localStorage.getItem('frigofrota_shopping_list') || '[]'),
-      avarias: JSON.parse(localStorage.getItem('frigofrota_avarias') || '{}'),
-      opcoesManutencao: JSON.parse(localStorage.getItem('frigofrota_opcoes_manutencao') || '[]'),
+      shoppingList: safeGetLocalStorage('frigofrota_shopping_list', []),
+      avarias: safeGetLocalStorage('frigofrota_avarias', {}),
+      opcoesManutencao: safeGetLocalStorage('frigofrota_opcoes_manutencao', []),
     };
 
     try {
@@ -390,7 +401,13 @@ export default function App() {
       });
 
       if (!res.ok) {
-        throw new Error('Erro ao salvar dados na nuvem.');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Erro ao salvar dados na nuvem.');
+      }
+
+      const data = await res.json();
+      if (!data.success) {
+        throw new Error(data.error || 'Erro ao salvar dados na nuvem.');
       }
 
       setSyncStatus('success');
