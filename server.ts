@@ -105,6 +105,13 @@ async function startServer() {
       const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
       fs.writeFileSync(filePath, JSON.stringify(dados, null, 2), "utf8");
 
+      // Salvar código ativo no servidor de forma persistente
+      try {
+        fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
+      } catch (err) {
+        console.error("Erro ao salvar active_code.txt:", err);
+      }
+
       res.json({ 
         success: true, 
         message: savedToCloud 
@@ -114,6 +121,21 @@ async function startServer() {
     } catch (error: any) {
       console.error("Erro ao salvar sincronização:", error);
       res.status(500).json({ success: false, error: error.message || "Erro ao salvar dados no servidor." });
+    }
+  });
+
+  // Endpoint para recuperar o código de frota ativo salvo no servidor
+  app.get("/api/sync/active-code", (req, res) => {
+    try {
+      const filePath = path.join(DATA_DIR, "active_code.txt");
+      if (fs.existsSync(filePath)) {
+        const codigoFrota = fs.readFileSync(filePath, "utf8").trim();
+        return res.json({ success: true, codigoFrota });
+      }
+      res.json({ success: true, codigoFrota: null });
+    } catch (error: any) {
+      console.error("Erro ao obter código ativo:", error);
+      res.status(500).json({ success: false, error: error.message });
     }
   });
 
@@ -138,6 +160,14 @@ async function startServer() {
           if (docSnap.exists()) {
             const data = docSnap.data();
             console.log(`[Firestore] Dados carregados com sucesso para a frota: ${safeCodigo}`);
+            
+            // Salvar como código ativo no servidor
+            try {
+              fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
+            } catch (err) {
+              console.error("Erro ao salvar active_code.txt:", err);
+            }
+
             return res.json({ success: true, dados: data.dados });
           }
           console.log(`[Firestore] Código ${safeCodigo} não encontrado no Firestore. Verificando em disco local...`);
@@ -154,6 +184,13 @@ async function startServer() {
 
       const dataStr = fs.readFileSync(filePath, "utf8");
       const dados = JSON.parse(dataStr);
+
+      // Salvar como código ativo no servidor
+      try {
+        fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
+      } catch (err) {
+        console.error("Erro ao salvar active_code.txt:", err);
+      }
 
       res.json({ success: true, dados });
     } catch (error: any) {

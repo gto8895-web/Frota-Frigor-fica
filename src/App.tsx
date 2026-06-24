@@ -475,6 +475,71 @@ export default function App() {
     localStorage.setItem('recuperar_auto_sync', String(autoSync));
   }, [autoSync]);
 
+  // Recuperação Automática de Dados se o cache do Chrome/LocalStorage for limpo
+  useEffect(() => {
+    const autoRecuperarDados = async () => {
+      try {
+        const localCode = localStorage.getItem('recuperar_codigo_frota');
+        const hasLocalVehicles = localStorage.getItem('ff_veiculos');
+        
+        // Se o localCode estiver vazio ou não houver veículos salvos no localStorage (indicando limpeza de dados)
+        if (!localCode || !hasLocalVehicles) {
+          console.log('[RECUPERAR] Tentando obter o código ativo do servidor...');
+          const res = await fetch('/api/sync/active-code');
+          if (res.ok) {
+            const data = await res.json();
+            if (data.success && data.codigoFrota) {
+              const serverCode = data.codigoFrota;
+              console.log('[RECUPERAR] Código ativo encontrado no servidor:', serverCode);
+              
+              // Carregar os dados correspondentes silenciosamente do servidor / Firestore
+              const loadRes = await fetch(`/api/sync/load/${serverCode}`);
+              if (loadRes.ok) {
+                const loadData = await loadRes.json();
+                if (loadData.success && loadData.dados) {
+                  const { veiculos: cloudVeic, manutencoes: cloudMaint, custoPadraoDiario: cloudCusto, shoppingList, avarias, opcoesManutencao } = loadData.dados;
+                  
+                  if (cloudVeic) {
+                    setVeiculos(cloudVeic);
+                    localStorage.setItem('ff_veiculos', JSON.stringify(cloudVeic));
+                  }
+                  if (cloudMaint) {
+                    setManutencoes(cloudMaint);
+                    localStorage.setItem('ff_manutencoes', JSON.stringify(cloudMaint));
+                  }
+                  if (cloudCusto) {
+                    setCustoPadraoDiario(cloudCusto);
+                    localStorage.setItem('ff_custo_diario', String(cloudCusto));
+                  }
+                  if (shoppingList) {
+                    localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
+                  }
+                  if (avarias) {
+                    localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
+                  }
+                  if (opcoesManutencao) {
+                    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
+                  }
+                  
+                  setCodigoFrota(serverCode);
+                  localStorage.setItem('recuperar_codigo_frota', serverCode);
+                  setAutoSync(true);
+                  localStorage.setItem('recuperar_auto_sync', 'true');
+                  
+                  console.log('[RECUPERAR] Sucesso: Dados restaurados de forma totalmente transparente e automática!');
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[RECUPERAR] Erro na recuperação automática de dados:', err);
+      }
+    };
+    
+    autoRecuperarDados();
+  }, []);
+
   return (
     <div className="min-h-screen bg-[#0f172a] text-slate-100 flex flex-col justify-between">
       
