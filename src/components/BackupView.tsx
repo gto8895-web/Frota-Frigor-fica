@@ -86,26 +86,46 @@ export default function BackupView({
     }
   };
 
+  // Helper para ler itens adicionais do localStorage de forma segura
+  const obterLocalStorageData = (key: string, fallback: any) => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved ? JSON.parse(saved) : fallback;
+    } catch (e) {
+      return fallback;
+    }
+  };
+
   const handleExportBackup = () => {
     try {
       const shoppingList = obterItensShoppingList();
+      const avarias = obterLocalStorageData('frigofrota_avarias', {});
+      const opcoesManutencao = obterLocalStorageData('frigofrota_opcoes_manutencao', []);
+
       const backupData = {
         frigofrota_backup: true,
         data_criacao: new Date().toISOString(),
         veiculos,
         manutencoes,
         custoPadraoDiario,
-        shopping_list: shoppingList
+        shopping_list: shoppingList,
+        avarias: avarias,
+        opcoesManutencao: opcoesManutencao
       };
 
       const jsonStr = JSON.stringify(backupData, null, 2);
       const blob = new Blob([jsonStr], { type: 'application/json' });
       const blobUrl = URL.createObjectURL(blob);
       
+      const now = new Date();
+      const dia = String(now.getDate()).padStart(2, '0');
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const ano = now.getFullYear();
+      const dataBr = `${dia}-${mes}-${ano}`;
+
       const downloadAnchor = document.createElement('a');
-      const dataIso = new Date().toISOString().slice(0, 10);
       downloadAnchor.setAttribute('href', blobUrl);
-      downloadAnchor.setAttribute('download', `frigofrota_backup_${dataIso}.json`);
+      downloadAnchor.setAttribute('download', `Recuperar_Backup_${dataBr}.json`);
       document.body.appendChild(downloadAnchor);
       downloadAnchor.click();
       
@@ -167,10 +187,26 @@ export default function BackupView({
           localStorage.setItem('frigofrota_shopping_list', JSON.stringify(parsed.shopping_list));
         }
 
+        // Caso haja checklists de avarias, salvar no localStorage
+        if (parsed.avarias) {
+          localStorage.setItem('frigofrota_avarias', JSON.stringify(parsed.avarias));
+        }
+
+        // Caso haja opções customizadas de manutenção, salvar no localStorage
+        if (parsed.opcoesManutencao) {
+          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(parsed.opcoesManutencao));
+        }
+
         setStatusMessage({
-          text: `Backup restaurado com sucesso! Importados ${parsed.veiculos.length} caminhões e ${parsed.manutencoes.length} manutenções.`,
+          text: `Backup restaurado com sucesso! Importados ${parsed.veiculos.length} caminhões e ${parsed.manutencoes.length} manutenções. Atualizando o painel...`,
           type: 'success'
         });
+
+        // Força uma atualização limpa para recarregar todos os componentes com dados novos do localStorage
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+
       } catch (error: any) {
         setStatusMessage({
           text: error.message || 'Erro ao processar arquivo de backup. Certifique-se de que é um arquivo .json válido gerado pelo Frigofrota.',
@@ -447,8 +483,7 @@ export default function BackupView({
               ref={fileInputRef}
               onChange={handleFileChange}
               accept=".json,application/json,text/plain"
-              className="absolute pointer-events-none opacity-0"
-              style={{ width: 1, height: 1, top: 0, left: 0 }}
+              className="sr-only"
             />
           </div>
 

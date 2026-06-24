@@ -336,6 +336,9 @@ export default function App() {
     manutencoes: Manutencao[];
     custoPadraoDiario: number;
   }) => {
+    localStorage.setItem('ff_veiculos', JSON.stringify(data.veiculos));
+    localStorage.setItem('ff_manutencoes', JSON.stringify(data.manutencoes));
+    localStorage.setItem('ff_custo_diario', data.custoPadraoDiario.toString());
     setVeiculos(data.veiculos);
     setManutencoes(data.manutencoes);
     setCustoPadraoDiario(data.custoPadraoDiario);
