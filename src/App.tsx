@@ -96,6 +96,122 @@ export default function App() {
   });
   const [isIOS, setIsIOS] = useState<boolean>(false);
   const [showIOSHintModal, setShowIOSHintModal] = useState<boolean>(false);
+  const [showAutoBackupNotification, setShowAutoBackupNotification] = useState<string | null>(null);
+
+  // Backup Automático de Sábado às 21:00
+  useEffect(() => {
+    if (isInitializing) return;
+
+    const verificarEExecutarAutoBackup = () => {
+      try {
+        const autoBackupEnabled = localStorage.getItem('frigofrota_auto_backup_sabado_enabled') !== 'false';
+        if (!autoBackupEnabled) return;
+
+        const now = new Date();
+        const targetSaturday = getMostRecentSaturday21h(now);
+        
+        // Se o sábado calculado ainda está no futuro em relação ao momento atual, não faz nada
+        if (targetSaturday.getTime() > now.getTime()) {
+          return;
+        }
+
+        const targetId = targetSaturday.toISOString(); // Ex: '2026-06-20T21:00:00.000Z'
+        const lastExecuted = localStorage.getItem('frigofrota_last_auto_backup_saturday');
+
+        if (lastExecuted !== targetId) {
+          console.log('[AutoBackup] Executando backup automático do Sábado às 21:00:', targetId);
+          
+          const shoppingList = (() => {
+            try {
+              const saved = localStorage.getItem('frigofrota_shopping_list');
+              return saved ? JSON.parse(saved) : [];
+            } catch {
+              return [];
+            }
+          })();
+
+          const avarias = (() => {
+            try {
+              const saved = localStorage.getItem('frigofrota_avarias');
+              return saved ? JSON.parse(saved) : {};
+            } catch {
+              return {};
+            }
+          })();
+
+          const opcoesManutencao = (() => {
+            try {
+              const saved = localStorage.getItem('frigofrota_opcoes_manutencao');
+              return saved ? JSON.parse(saved) : [];
+            } catch {
+              return [];
+            }
+          })();
+
+          const backupData = {
+            id: targetId,
+            data_criacao: new Date().toISOString(),
+            data_referencia_sabado: targetSaturday.toLocaleDateString('pt-BR') + ' às 21:00',
+            veiculos,
+            manutencoes,
+            custoPadraoDiario,
+            shopping_list: shoppingList,
+            avarias: avarias,
+            opcoesManutencao: opcoesManutencao
+          };
+
+          const backupListSaved = localStorage.getItem('frigofrota_auto_backups_list');
+          let backupList = [];
+          if (backupListSaved) {
+            try {
+              backupList = JSON.parse(backupListSaved);
+            } catch {
+              backupList = [];
+            }
+          }
+
+          if (!backupList.some((b: any) => b.id === targetId)) {
+            backupList.unshift(backupData);
+            if (backupList.length > 10) {
+              backupList = backupList.slice(0, 10);
+            }
+            localStorage.setItem('frigofrota_auto_backups_list', JSON.stringify(backupList));
+          }
+
+          localStorage.setItem('frigofrota_last_auto_backup_saturday', targetId);
+          setShowAutoBackupNotification(targetSaturday.toLocaleDateString('pt-BR') + ' às 21:00');
+        }
+      } catch (err) {
+        console.error('[AutoBackup] Erro no processamento:', err);
+      }
+    };
+
+    const getMostRecentSaturday21h = (dateVal: Date): Date => {
+      const result = new Date(dateVal.getTime());
+      result.setHours(21, 0, 0, 0);
+      
+      const currentDay = dateVal.getDay();
+      let daysToSubtract = 0;
+      
+      if (currentDay === 6) {
+        if (dateVal.getHours() < 21) {
+          daysToSubtract = 7;
+        } else {
+          daysToSubtract = 0;
+        }
+      } else {
+        daysToSubtract = currentDay + 1;
+      }
+      
+      result.setDate(result.getDate() - daysToSubtract);
+      return result;
+    };
+
+    verificarEExecutarAutoBackup();
+    const interval = setInterval(verificarEExecutarAutoBackup, 60000);
+    return () => clearInterval(interval);
+
+  }, [isInitializing, veiculos, manutencoes, custoPadraoDiario]);
 
   // Detectar suporte à instalação no Chrome e se é dispositivo iOS (iPhone / iPad)
   useEffect(() => {
@@ -718,6 +834,38 @@ export default function App() {
 
       {/* Margem principal de exibição */}
       <main className="max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex-1 pb-20 md:pb-8">
+
+        {/* Notificação de Backup Automático de Sábado */}
+        {showAutoBackupNotification && (
+          <div className="fixed bottom-20 right-4 left-4 md:bottom-6 md:right-6 md:left-auto z-50 bg-[#020617] border border-emerald-500/40 text-slate-100 p-4 rounded-2xl shadow-2xl max-w-sm animate-fade-in flex items-start gap-3.5 shadow-emerald-500/10 no-print">
+            <div className="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20 shrink-0 mt-0.5">
+              <Wrench className="w-5 h-5 animate-bounce" />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-display font-semibold text-white text-xs uppercase tracking-wider">Backup de Sábado Salvo</h4>
+              <p className="text-[11px] text-slate-350 mt-1 leading-relaxed">
+                Uma cópia de segurança semanal do painel foi criada com sucesso referente a <span className="font-semibold text-emerald-400">{showAutoBackupNotification}</span>.
+              </p>
+              <div className="flex gap-2 mt-2.5">
+                <button
+                  onClick={() => {
+                    setTabAtiva('backup');
+                    setShowAutoBackupNotification(null);
+                  }}
+                  className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-[10px] transition-all cursor-pointer"
+                >
+                  Ver Backups
+                </button>
+                <button
+                  onClick={() => setShowAutoBackupNotification(null)}
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-lg text-[10px] transition-all cursor-pointer"
+                >
+                  Fechar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Banner de Instalação PWA */}
         {showInstallBanner && (

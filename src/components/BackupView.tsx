@@ -51,6 +51,116 @@ export default function BackupView({
   const [frotasExistentes, setFrotasExistentes] = useState<{ codigo: string; nomeEmpresa: string; updatedAt?: string }[]>([]);
   const [loadingFrotas, setLoadingFrotas] = useState(false);
 
+  const [autoBackupEnabled, setAutoBackupEnabled] = useState<boolean>(() => {
+    return localStorage.getItem('frigofrota_auto_backup_sabado_enabled') !== 'false';
+  });
+  const [autoBackupsList, setAutoBackupsList] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_auto_backups_list');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleToggleAutoBackup = (enabled: boolean) => {
+    setAutoBackupEnabled(enabled);
+    localStorage.setItem('frigofrota_auto_backup_sabado_enabled', String(enabled));
+    setStatusMessage({
+      text: enabled 
+        ? 'Backup Automático de Sábado ativado com sucesso! Toda semana às 21:00 o sistema salvará os seus dados automaticamente.' 
+        : 'Backup Automático de Sábado desativado.',
+      type: 'success'
+    });
+  };
+
+  const handleRestoreAutoBackup = (backupItem: any) => {
+    if (window.confirm(`Tem certeza que deseja restaurar o backup automático referente a ${backupItem.data_referencia_sabado}? Isso substituirá todos os dados atuais.`)) {
+      onRestoreBackup({
+        veiculos: backupItem.veiculos,
+        manutencoes: backupItem.manutencoes,
+        custoPadraoDiario: backupItem.custoPadraoDiario,
+        shopping_list: backupItem.shopping_list || []
+      });
+
+      if (backupItem.shopping_list) {
+        localStorage.setItem('frigofrota_shopping_list', JSON.stringify(backupItem.shopping_list));
+      }
+      if (backupItem.avarias) {
+        localStorage.setItem('frigofrota_avarias', JSON.stringify(backupItem.avarias));
+      }
+      if (backupItem.opcoesManutencao) {
+        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(backupItem.opcoesManutencao));
+      }
+
+      setStatusMessage({
+        text: 'Backup automático restaurado com sucesso! Recarregando painel...',
+        type: 'success'
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 1500);
+    }
+  };
+
+  const handleDownloadAutoBackup = (backupItem: any) => {
+    try {
+      const backupData = {
+        frigofrota_backup: true,
+        data_criacao: backupItem.data_criacao,
+        veiculos: backupItem.veiculos,
+        manutencoes: backupItem.manutencoes,
+        custoPadraoDiario: backupItem.custoPadraoDiario,
+        shopping_list: backupItem.shopping_list || [],
+        avarias: backupItem.avarias || {},
+        opcoesManutencao: backupItem.opcoesManutencao || []
+      };
+
+      const jsonStr = JSON.stringify(backupData, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const now = new Date(backupItem.id);
+      const dia = String(now.getDate()).padStart(2, '0');
+      const mes = String(now.getMonth() + 1).padStart(2, '0');
+      const ano = now.getFullYear();
+      const dataBr = `${dia}-${mes}-${ano}`;
+
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute('href', blobUrl);
+      downloadAnchor.setAttribute('download', `Recuperar_Backup_${dataBr}_AUTO.json`);
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      
+      document.body.removeChild(downloadAnchor);
+      URL.revokeObjectURL(blobUrl);
+
+      setStatusMessage({
+        text: 'Arquivo de backup automático baixado com sucesso!',
+        type: 'success'
+      });
+    } catch (e) {
+      console.error(e);
+      setStatusMessage({
+        text: 'Erro ao baixar backup automático.',
+        type: 'error'
+      });
+    }
+  };
+
+  const handleDeleteAutoBackup = (id: string) => {
+    if (window.confirm('Deseja realmente excluir este ponto de restaurar automático da lista?')) {
+      const updated = autoBackupsList.filter((b: any) => b.id !== id);
+      setAutoBackupsList(updated);
+      localStorage.setItem('frigofrota_auto_backups_list', JSON.stringify(updated));
+      setStatusMessage({
+        text: 'Ponto de restauração automático excluído com sucesso.',
+        type: 'success'
+      });
+    }
+  };
+
   React.useEffect(() => {
     const fetchFrotas = async () => {
       setLoadingFrotas(true);
@@ -443,6 +553,94 @@ export default function BackupView({
                 <div className="w-2 h-2 rounded-full bg-teal-500"></div>
                 <span className="text-slate-300">Lista Compras: <strong className="text-white">{shoppingListLength} itens</strong></span>
               </div>
+            </div>
+          </div>
+
+          {/* SEÇÃO DE BACKUP AUTOMÁTICO DE SÁBADO ÀS 21:00 */}
+          <div className="bg-[#020617]/40 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
+                  <Clock className="w-4 h-4 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Backup Automático Semanal</h3>
+                  <p className="text-[10px] text-slate-400">Ponto de restauração congelado todo Sábado às 21:00</p>
+                </div>
+              </div>
+
+              {/* Toggle Switch */}
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoBackupEnabled}
+                  onChange={(e) => handleToggleAutoBackup(e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-850 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 after:border-slate-350 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-transparent"></div>
+                <span className="ml-2 text-xs font-semibold text-slate-300">
+                  {autoBackupEnabled ? 'Ativo' : 'Inativo'}
+                </span>
+              </label>
+            </div>
+
+            <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
+              Com este recurso ativado, se o aplicativo estiver aberto ou quando você acessá-lo após o horário, o sistema gera automaticamente uma cópia congelada de segurança local para que você possa restaurá-la a qualquer momento em caso de perda de dados.
+            </p>
+
+            {/* Lista de Backups Automáticos */}
+            <div className="space-y-2 pt-1">
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pontos de Restauração Salvos ({autoBackupsList.length}/10):</label>
+              
+              {autoBackupsList.length === 0 ? (
+                <div className="bg-[#1e293b]/25 border border-dashed border-slate-800 rounded-lg p-4 text-center text-xs text-slate-500 font-sans">
+                  Nenhum backup automático criado ainda. O sistema salvará uma cópia automaticamente no próximo sábado às 21:00 se houver dados ativos.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                  {autoBackupsList.map((item: any) => (
+                    <div key={item.id} className="bg-[#1e293b]/45 border border-slate-800/80 p-3 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700/60 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
+                          <p className="text-xs font-bold text-slate-200">Sábado, {item.data_referencia_sabado}</p>
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {item.veiculos?.length || 0} Caminhões • {item.manutencoes?.length || 0} Manutenções • R$ {item.custoPadraoDiario || 150} diário
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRestoreAutoBackup(item)}
+                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer"
+                          title="Restaurar este ponto"
+                        >
+                          Restaurar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAutoBackup(item)}
+                          className="bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-700 px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer flex items-center gap-1"
+                          title="Baixar arquivo JSON"
+                        >
+                          <Download className="w-3 h-3 text-amber-500" />
+                          JSON
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAutoBackup(item.id)}
+                          className="bg-rose-950/35 hover:bg-rose-900/60 text-rose-400 px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer"
+                          title="Excluir da lista"
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
