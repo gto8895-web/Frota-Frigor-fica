@@ -588,7 +588,13 @@ export default function App() {
             </nav>
 
             {/* Estatísticas resumidas na Direção do Usuário */}
-            <div className="flex items-center shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
+              {codigoFrota && (
+                <span className="hidden sm:inline-flex bg-sky-950/45 text-sky-450 border border-sky-800/40 rounded-lg px-2.5 py-1 text-xs font-mono font-bold items-center gap-1.5 shadow-sm">
+                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
+                  <span>NUVEM: {codigoFrota}</span>
+                </span>
+              )}
               <span className="bg-[#1e293b] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs sm:text-sm font-mono font-medium flex items-center gap-1.5 sm:gap-2 shadow-md">
                 <span>📅 {dataReferencia.split('-').reverse().join('/')}</span>
                 <span className="text-slate-500">|</span>
@@ -756,6 +762,11 @@ export default function App() {
             custoPadraoDiario={custoPadraoDiario}
             onUpdateCustoPadraoDiario={setCustoPadraoDiario}
             onNavigate={(id) => setTabAtiva(id)}
+            codigoFrota={codigoFrota}
+            setCodigoFrota={setCodigoFrota}
+            onCarregarDaNuvem={carregarDaNuvem}
+            syncStatus={syncStatus}
+            syncError={syncError}
           />
         )}
 

@@ -1,25 +1,37 @@
 import React, { useState } from 'react';
 import { Veiculo } from '../types';
-import { Truck, ShoppingBag, DollarSign, Edit2, Check, X, Database } from 'lucide-react';
+import { Truck, ShoppingBag, DollarSign, Edit2, Check, X, Database, Cloud, RefreshCw, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface DashboardViewProps {
   veiculos: Veiculo[];
   custoPadraoDiario: number;
   onUpdateCustoPadraoDiario: (novoCusto: number) => void;
   onNavigate: (tab: 'dashboard' | 'veiculos' | 'manutencoes' | 'orcamento' | 'compras' | 'backup') => void;
+  codigoFrota: string;
+  setCodigoFrota: (code: string) => void;
+  onCarregarDaNuvem: (code: string) => Promise<any>;
+  syncStatus: 'idle' | 'syncing' | 'success' | 'error';
+  syncError: string | null;
 }
 
 export default function DashboardView({
   veiculos,
   custoPadraoDiario,
   onUpdateCustoPadraoDiario,
-  onNavigate
+  onNavigate,
+  codigoFrota,
+  setCodigoFrota,
+  onCarregarDaNuvem,
+  syncStatus,
+  syncError
 }: DashboardViewProps) {
   const totalVeiculos = veiculos.length;
   
   // Local states for editing the standard rate inline
   const [isEditing, setIsEditing] = useState(false);
   const [tempValue, setTempValue] = useState(custoPadraoDiario.toString());
+  const [inputCodigo, setInputCodigo] = useState('');
+  const [showRestoreWidget, setShowRestoreWidget] = useState(true);
 
   const handleSave = (e?: React.FormEvent) => {
     if (e) {
@@ -38,6 +50,13 @@ export default function DashboardView({
     setIsEditing(false);
   };
 
+  const handleRestoreFromDashboard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inputCodigo.trim()) return;
+    setCodigoFrota(inputCodigo.trim().toUpperCase());
+    await onCarregarDaNuvem(inputCodigo.trim());
+  };
+
   return (
     <div className="space-y-6">
       {/* Header com Boas-vindas */}
@@ -48,6 +67,66 @@ export default function DashboardView({
           </h1>
         </div>
       </div>
+
+      {/* Widget de Recuperação da Nuvem se o código local estiver vazio */}
+      {!codigoFrota && showRestoreWidget && (
+        <div className="bg-[#020617] border border-sky-500/40 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+          <div className="absolute top-3 right-3">
+            <button 
+              onClick={() => setShowRestoreWidget(false)}
+              className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer"
+              title="Dispensar sugestão"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-sky-500/10 text-sky-400 rounded-xl border border-sky-500/20 shrink-0">
+                <Cloud className="w-5 h-5 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="font-display font-bold text-white text-sm">Seus dados já estão salvos na Nuvem!</h3>
+                <p className="text-xs text-slate-350 leading-relaxed max-w-xl">
+                  Se você limpou o cache do Chrome ou está acessando de outro celular, digite o seu <strong className="text-sky-400">Código da sua Frota</strong> abaixo para recuperar todos os caminhões e manutenções na hora.
+                </p>
+              </div>
+            </div>
+            <form onSubmit={handleRestoreFromDashboard} className="flex flex-col sm:flex-row gap-2 shrink-0 md:max-w-xs w-full">
+              <input
+                type="text"
+                value={inputCodigo}
+                onChange={(e) => setInputCodigo(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
+                placeholder="Ex: FROTA-ABC"
+                className="bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono font-bold text-sky-400 uppercase placeholder:text-slate-500 focus:outline-none focus:border-sky-400 w-full"
+                maxLength={15}
+              />
+              <button
+                type="submit"
+                disabled={syncStatus === 'syncing' || !inputCodigo.trim()}
+                className="bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs px-4 py-2 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap"
+              >
+                {syncStatus === 'syncing' ? (
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Cloud className="w-3.5 h-3.5" />
+                )}
+                Restaurar
+              </button>
+            </form>
+          </div>
+          {syncStatus === 'success' && (
+            <div className="mt-3 text-xs text-emerald-400 flex items-center gap-1.5 font-medium bg-emerald-500/5 p-2 rounded-lg border border-emerald-500/15">
+              <ShieldCheck className="w-4 h-4 shrink-0" /> Sincronização restaurada com sucesso! Todos os seus dados foram recarregados.
+            </div>
+          )}
+          {syncStatus === 'error' && (
+            <div className="mt-3 text-xs text-rose-400 flex items-center gap-1.5 font-medium bg-rose-500/5 p-2 rounded-lg border border-rose-500/15">
+              <AlertTriangle className="w-4 h-4 shrink-0" /> {syncError || 'Código inválido ou erro ao se conectar com a nuvem.'}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Grid de Estatísticas Rápidas e Botões Principais */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 items-start">
