@@ -121,7 +121,7 @@ export function PlacaMercosul({ placa }: { placa: string }) {
       {/* Plate Body */}
       <div className="bg-white px-1 py-0 flex items-center justify-center relative h-8 border-t-2 border-blue-600">
         <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold font-sans">BR</span>
-        <span className="text-[21px] font-plate font-bold tracking-wider text-slate-950 leading-none relative -translate-y-[3px]">
+        <span className="text-[21px] font-plate tracking-wider text-slate-950 leading-none relative -translate-y-[2px]">
           {placaFormatada}
         </span>
       </div>
