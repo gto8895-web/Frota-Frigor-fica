@@ -111,17 +111,17 @@ export function PlacaMercosul({ placa }: { placa: string }) {
   const placaFormatada = formatPlaca(placa);
 
   return (
-    <div className="inline-flex flex-col w-[126px] border border-blue-600 rounded-sm overflow-hidden bg-white shadow-md select-none">
+    <div className="inline-flex flex-col w-[145px] border-2 border-blue-600 rounded-[4px] overflow-hidden bg-white shadow-md select-none">
       {/* Blue Top Band */}
-      <div className="bg-[#0051A3] text-white px-1.5 py-0.5 flex items-center justify-between text-[7px] font-bold tracking-wider leading-none select-none h-3.5">
+      <div className="bg-[#0051A3] text-white px-2 py-0.5 flex items-center justify-between text-[7px] font-bold tracking-wider leading-none select-none h-4">
         <span className="text-[5px] text-blue-200">✨</span>
-        <span className="uppercase text-[8px] font-sans font-extrabold tracking-widest text-center flex-1">BRASIL</span>
-        <span className="text-[8px] leading-none">🇧🇷</span>
+        <span className="uppercase text-[8.5px] font-sans font-extrabold tracking-widest text-center flex-1">BRASIL</span>
+        <span className="text-[8.5px] leading-none">🇧🇷</span>
       </div>
       {/* Plate Body */}
-      <div className="bg-white px-1 py-1 flex items-center justify-center relative min-h-[25px] border-t border-blue-600">
+      <div className="bg-white px-1 py-0 flex items-center justify-center relative h-8 border-t-2 border-blue-600">
         <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold font-sans">BR</span>
-        <span className="text-[14.5px] font-fe-schrift font-bold tracking-widest text-slate-950 leading-none">
+        <span className="text-[21px] font-plate font-bold tracking-wider text-slate-950 leading-none relative -translate-y-[4.5px]">
           {placaFormatada}
         </span>
       </div>
@@ -1278,7 +1278,7 @@ export default function VehiclesView({
       )}
 
       {/* Nota Operacional */}
-      <div className="bg-amber-950/20 border border-amber-800/40 p-4 rounded-xl text-xs text-slate-200 flex items-start gap-2 select-none">
+      <div className="py-3 px-1 text-xs text-slate-300 flex items-start gap-2.5 select-none mt-4">
         <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
         <div>
           <span className="font-semibold text-amber-400 block pb-0.5">Dica de Sensor de Climatização:</span>

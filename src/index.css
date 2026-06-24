@@ -9,6 +9,18 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'FE Font';
+  src: url('/fonts/FE-Schrift.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+.font-plate {
+  font-family: 'FE-Schrift', 'FE Font', sans-serif;
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
