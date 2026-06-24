@@ -4,8 +4,6 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 import fs from "fs";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, setDoc, getDoc } from "firebase/firestore";
 
 dotenv.config();
 
@@ -15,20 +13,93 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
-// Initialize Firebase Firestore dynamically if configuration exists
-let db: any = null;
-try {
-  const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
-  if (fs.existsSync(firebaseConfigPath)) {
+// Helper to write to Firestore via REST API
+async function saveToFirestoreREST(codigo: string, dados: any): Promise<boolean> {
+  try {
+    const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(firebaseConfigPath)) {
+      console.warn("[Firestore REST API] firebase-applet-config.json não localizado.");
+      return false;
+    }
+    
     const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
-    const firebaseApp = initializeApp(config);
-    db = getFirestore(firebaseApp, config.firestoreDatabaseId);
-    console.log("Firebase Firestore inicializado com sucesso usando o banco de dados:", config.firestoreDatabaseId);
-  } else {
-    console.warn("firebase-applet-config.json não localizado. Usando persistência em disco local como fallback.");
+    const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${config.firestoreDatabaseId}/documents/frotas/${codigo}?key=${config.apiKey}`;
+    
+    const body = {
+      name: `projects/${config.projectId}/databases/${config.firestoreDatabaseId}/documents/frotas/${codigo}`,
+      fields: {
+        dados: {
+          stringValue: JSON.stringify(dados)
+        },
+        updatedAt: {
+          stringValue: new Date().toISOString()
+        }
+      }
+    };
+
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(body)
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[Firestore REST API] Falha ao salvar para ${codigo}. Status: ${res.status}, Erro:`, errText);
+      return false;
+    }
+
+    console.log(`[Firestore REST API] Sincronização gravada com sucesso para: ${codigo}`);
+    return true;
+  } catch (error) {
+    console.error("[Firestore REST API] Erro na requisição de salvamento:", error);
+    return false;
   }
-} catch (error) {
-  console.error("Falha ao inicializar o Firebase Firestore:", error);
+}
+
+// Helper to read from Firestore via REST API
+async function loadFromFirestoreREST(codigo: string): Promise<any | null> {
+  try {
+    const firebaseConfigPath = path.join(process.cwd(), "firebase-applet-config.json");
+    if (!fs.existsSync(firebaseConfigPath)) {
+      console.warn("[Firestore REST API] firebase-applet-config.json não localizado.");
+      return null;
+    }
+    
+    const config = JSON.parse(fs.readFileSync(firebaseConfigPath, "utf8"));
+    const url = `https://firestore.googleapis.com/v1/projects/${config.projectId}/databases/${config.firestoreDatabaseId}/documents/frotas/${codigo}?key=${config.apiKey}`;
+    
+    const res = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json"
+      }
+    });
+
+    if (res.status === 404) {
+      console.log(`[Firestore REST API] Código ${codigo} não localizado (404).`);
+      return null;
+    }
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[Firestore REST API] Falha ao ler de ${codigo}. Status: ${res.status}, Erro:`, errText);
+      return null;
+    }
+
+    const docData = await res.json();
+    if (docData && docData.fields && docData.fields.dados && docData.fields.dados.stringValue) {
+      console.log(`[Firestore REST API] Dados carregados com sucesso para a frota: ${codigo}`);
+      return JSON.parse(docData.fields.dados.stringValue);
+    }
+    
+    return null;
+  } catch (error) {
+    console.error("[Firestore REST API] Erro na requisição de carregamento:", error);
+    return null;
+  }
 }
 
 async function startServer() {
@@ -85,21 +156,8 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "Código da frota inválido." });
       }
 
-      // Gravar no Firestore (Nuvem Real e Durável)
-      let savedToCloud = false;
-      if (db) {
-        try {
-          const docRef = doc(db, "frotas", safeCodigo);
-          await setDoc(docRef, {
-            dados,
-            updatedAt: new Date().toISOString(),
-          });
-          console.log(`[Firestore] Sincronização bem sucedida para: ${safeCodigo}`);
-          savedToCloud = true;
-        } catch (firestoreError: any) {
-          console.error("Erro ao gravar no Firestore:", firestoreError);
-        }
-      }
+      // Gravar no Firestore (Nuvem Real e Durável via REST API)
+      const savedToCloud = await saveToFirestoreREST(safeCodigo, dados);
 
       // Sempre grava localmente também para redundância e cache local
       const filePath = path.join(DATA_DIR, `frota_${safeCodigo}.json`);
@@ -152,28 +210,17 @@ async function startServer() {
         return res.status(400).json({ success: false, error: "Código da frota inválido." });
       }
 
-      // Carregar do Firestore
-      if (db) {
+      // Carregar do Firestore (Nuvem Real e Durável via REST API)
+      const dadosNuvem = await loadFromFirestoreREST(safeCodigo);
+      if (dadosNuvem) {
+        // Salvar como código ativo no servidor
         try {
-          const docRef = doc(db, "frotas", safeCodigo);
-          const docSnap = await getDoc(docRef);
-          if (docSnap.exists()) {
-            const data = docSnap.data();
-            console.log(`[Firestore] Dados carregados com sucesso para a frota: ${safeCodigo}`);
-            
-            // Salvar como código ativo no servidor
-            try {
-              fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
-            } catch (err) {
-              console.error("Erro ao salvar active_code.txt:", err);
-            }
-
-            return res.json({ success: true, dados: data.dados });
-          }
-          console.log(`[Firestore] Código ${safeCodigo} não encontrado no Firestore. Verificando em disco local...`);
-        } catch (firestoreError) {
-          console.error("Erro ao carregar do Firestore:", firestoreError);
+          fs.writeFileSync(path.join(DATA_DIR, "active_code.txt"), safeCodigo, "utf8");
+        } catch (err) {
+          console.error("Erro ao salvar active_code.txt:", err);
         }
+
+        return res.json({ success: true, dados: dadosNuvem });
       }
 
       // Fallback em disco local
