@@ -111,7 +111,7 @@ export function PlacaMercosul({ placa }: { placa: string }) {
   const placaFormatada = formatPlaca(placa);
 
   return (
-    <div className="inline-flex flex-col w-[120px] border border-blue-600 rounded-sm overflow-hidden bg-white shadow-md select-none font-sans">
+    <div className="inline-flex flex-col w-[126px] border border-blue-600 rounded-sm overflow-hidden bg-white shadow-md select-none">
       {/* Blue Top Band */}
       <div className="bg-[#0051A3] text-white px-1.5 py-0.5 flex items-center justify-between text-[7px] font-bold tracking-wider leading-none select-none h-3.5">
         <span className="text-[5px] text-blue-200">✨</span>
@@ -119,9 +119,9 @@ export function PlacaMercosul({ placa }: { placa: string }) {
         <span className="text-[8px] leading-none">🇧🇷</span>
       </div>
       {/* Plate Body */}
-      <div className="bg-white px-1 py-1 flex items-center justify-center relative min-h-[22px] border-t border-blue-600">
-        <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold">BR</span>
-        <span className="text-xs font-sans font-extrabold tracking-widest text-[#111111] leading-none">
+      <div className="bg-white px-1 py-1 flex items-center justify-center relative min-h-[25px] border-t border-blue-600">
+        <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold font-sans">BR</span>
+        <span className="text-[14.5px] font-fe-schrift font-bold tracking-widest text-slate-950 leading-none">
           {placaFormatada}
         </span>
       </div>

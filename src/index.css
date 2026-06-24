@@ -1,9 +1,18 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@font-face {
+  font-family: 'FE-Schrift';
+  src: url('/fonts/FE-Schrift.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-display: "Space Grotesk", sans-serif;
+  --font-fe-schrift: "FE-Schrift", sans-serif;
   
   --color-brand-50: #020617;
   --color-brand-100: #1e293b;
