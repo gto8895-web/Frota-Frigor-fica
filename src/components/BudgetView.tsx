@@ -253,7 +253,7 @@ export default function BudgetView({
             onChange={(e) => onChangeDataReferencia(e.target.value)}
           />
           <p className="text-xxs text-slate-500 mt-1">
-            Escolha a data para auditar a folha de orçamentos e as vistorias correspondentes.
+            Escolha a Data dos Serviços para gerar um Orçamento.
           </p>
         </div>
 

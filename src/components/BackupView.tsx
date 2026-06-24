@@ -47,56 +47,79 @@ export default function BackupView({
   const [statusMessage, setStatusMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [nomeEmpresa, setNomeEmpresa] = useState<string>(() => {
-    return localStorage.getItem('recuperar_nome_empresa') || '';
-  });
-  const [frotasExistentes, setFrotasExistentes] = useState<{ codigo: string; nomeEmpresa: string; updatedAt?: string }[]>([]);
-  const [loadingFrotas, setLoadingFrotas] = useState(false);
+  const [backupsNuvem, setBackupsNuvem] = useState<any[]>([]);
+  const [selectedBackupIndex, setSelectedBackupIndex] = useState<number | null>(null);
+  const [loadingBackups, setLoadingBackups] = useState(false);
 
-  const [autoBackupEnabled, setAutoBackupEnabled] = useState<boolean>(() => {
-    return localStorage.getItem('frigofrota_auto_backup_sabado_enabled') !== 'false';
-  });
-  const [autoBackupsList, setAutoBackupsList] = useState<any[]>(() => {
+  const fetchBackupsNuvem = async () => {
+    if (!codigoFrota) return;
+    setLoadingBackups(true);
     try {
-      const saved = localStorage.getItem('frigofrota_auto_backups_list');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
+      const docRef = doc(db, 'frotas', codigoFrota);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        const docData = docSnap.data();
+        if (docData && docData.dados) {
+          const parsed = JSON.parse(docData.dados);
+          if (parsed && Array.isArray(parsed.backups)) {
+            setBackupsNuvem(parsed.backups);
+          } else if (parsed && parsed.veiculos) {
+            // Retrocompatibilidade se era um backup único antes
+            setBackupsNuvem([{
+              id: 'old-1',
+              data_criacao: parsed.updatedAt || new Date().toISOString(),
+              label: 'Backup Anterior',
+              veiculos: parsed.veiculos,
+              manutencoes: parsed.manutencoes,
+              custoPadraoDiario: parsed.custoPadraoDiario || 150,
+              shopping_list: parsed.shopping_list || [],
+              avarias: parsed.avarias || {},
+              opcoesManutencao: parsed.opcoesManutencao || []
+            }]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar backups da nuvem:", err);
+    } finally {
+      setLoadingBackups(false);
     }
-  });
-
-  const handleToggleAutoBackup = (enabled: boolean) => {
-    setAutoBackupEnabled(enabled);
-    localStorage.setItem('frigofrota_auto_backup_sabado_enabled', String(enabled));
-    setStatusMessage({
-      text: enabled 
-        ? 'Backup Automático de Sábado ativado com sucesso! Toda semana às 21:00 o sistema salvará os seus dados automaticamente.' 
-        : 'Backup Automático de Sábado desativado.',
-      type: 'success'
-    });
   };
 
-  const handleRestoreAutoBackup = (backupItem: any) => {
-    if (window.confirm(`Tem certeza que deseja restaurar o backup automático referente a ${backupItem.data_referencia_sabado}? Isso substituirá todos os dados atuais.`)) {
+  React.useEffect(() => {
+    fetchBackupsNuvem();
+  }, [codigoFrota]);
+
+  const handleImportCloudBackup = () => {
+    if (selectedBackupIndex === null || !backupsNuvem[selectedBackupIndex]) {
+      alert('Por favor, selecione um Backup.');
+      return;
+    }
+    const b = backupsNuvem[selectedBackupIndex];
+    if (window.confirm(`Deseja realmente restaurar o Backup do dia ${b.label}? Isso substituirá todos os seus dados atuais.`)) {
       onRestoreBackup({
-        veiculos: backupItem.veiculos,
-        manutencoes: backupItem.manutencoes,
-        custoPadraoDiario: backupItem.custoPadraoDiario,
-        shopping_list: backupItem.shopping_list || []
+        veiculos: b.veiculos || [],
+        manutencoes: b.manutencoes || [],
+        custoPadraoDiario: b.custoPadraoDiario || 150,
+        shopping_list: b.shopping_list || []
       });
 
-      if (backupItem.shopping_list) {
-        localStorage.setItem('frigofrota_shopping_list', JSON.stringify(backupItem.shopping_list));
+      if (b.shopping_list) {
+        localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
       }
-      if (backupItem.avarias) {
-        localStorage.setItem('frigofrota_avarias', JSON.stringify(backupItem.avarias));
+      if (b.avarias) {
+        localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
       }
-      if (backupItem.opcoesManutencao) {
-        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(backupItem.opcoesManutencao));
+      
+      const listToSave = b.opcoesManutencao || [];
+      if (listToSave.length > 0) {
+        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
+      } else {
+        localStorage.removeItem('frigofrota_opcoes_manutencao');
       }
 
       setStatusMessage({
-        text: 'Backup automático restaurado com sucesso! Recarregando painel...',
+        text: `Backup (${b.label}) importado com sucesso! Recarregando...`,
         type: 'success'
       });
 
@@ -104,120 +127,6 @@ export default function BackupView({
         window.location.reload();
       }, 1500);
     }
-  };
-
-  const handleDownloadAutoBackup = (backupItem: any) => {
-    try {
-      const backupData = {
-        frigofrota_backup: true,
-        data_criacao: backupItem.data_criacao,
-        veiculos: backupItem.veiculos,
-        manutencoes: backupItem.manutencoes,
-        custoPadraoDiario: backupItem.custoPadraoDiario,
-        shopping_list: backupItem.shopping_list || [],
-        avarias: backupItem.avarias || {},
-        opcoesManutencao: backupItem.opcoesManutencao || []
-      };
-
-      const jsonStr = JSON.stringify(backupData, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
-      const blobUrl = URL.createObjectURL(blob);
-
-      const now = new Date(backupItem.id);
-      const dia = String(now.getDate()).padStart(2, '0');
-      const mes = String(now.getMonth() + 1).padStart(2, '0');
-      const ano = now.getFullYear();
-      const dataBr = `${dia}-${mes}-${ano}`;
-
-      const downloadAnchor = document.createElement('a');
-      downloadAnchor.setAttribute('href', blobUrl);
-      downloadAnchor.setAttribute('download', `Recuperar_Backup_${dataBr}_AUTO.json`);
-      document.body.appendChild(downloadAnchor);
-      downloadAnchor.click();
-      
-      document.body.removeChild(downloadAnchor);
-      URL.revokeObjectURL(blobUrl);
-
-      setStatusMessage({
-        text: 'Arquivo de backup automático baixado com sucesso!',
-        type: 'success'
-      });
-    } catch (e) {
-      console.error(e);
-      setStatusMessage({
-        text: 'Erro ao baixar backup automático.',
-        type: 'error'
-      });
-    }
-  };
-
-  const handleDeleteAutoBackup = (id: string) => {
-    if (window.confirm('Deseja realmente excluir este ponto de restaurar automático da lista?')) {
-      const updated = autoBackupsList.filter((b: any) => b.id !== id);
-      setAutoBackupsList(updated);
-      localStorage.setItem('frigofrota_auto_backups_list', JSON.stringify(updated));
-      setStatusMessage({
-        text: 'Ponto de restauração automático excluído com sucesso.',
-        type: 'success'
-      });
-    }
-  };
-
-  React.useEffect(() => {
-    const fetchFrotas = async () => {
-      setLoadingFrotas(true);
-      try {
-        // Tenta buscar diretamente do Firestore via SDK do cliente
-        let frotas: any[] = [];
-        let loadedDirectly = false;
-
-        try {
-          const registryRef = doc(db, 'frotas', '_REGISTRY');
-          const registrySnap = await getDoc(registryRef);
-          if (registrySnap.exists()) {
-            const data = registrySnap.data();
-            if (data && data.dados) {
-              const registryData = JSON.parse(data.dados);
-              if (registryData && Array.isArray(registryData.frotas)) {
-                frotas = registryData.frotas;
-                loadedDirectly = true;
-                console.log('Lista de frotas carregada diretamente do Firestore SDK.');
-              }
-            }
-          }
-        } catch (fsErr) {
-          console.warn('Falha ao obter frotas via Firestore SDK, tentando API de fallback...', fsErr);
-        }
-
-        // Se falhou por SDK do cliente, tenta a API Express
-        if (!loadedDirectly) {
-          try {
-            const res = await fetch('/api/sync/fleets');
-            if (res.ok) {
-              const data = await res.json();
-              if (data.success && data.frotas) {
-                frotas = data.frotas;
-                console.log('Lista de frotas carregada via API de fallback Express.');
-              }
-            }
-          } catch (apiErr) {
-            console.error('Falha total ao buscar frotas:', apiErr);
-          }
-        }
-
-        setFrotasExistentes(frotas);
-      } catch (e) {
-        console.error('Erro geral ao buscar frotas:', e);
-      } finally {
-        setLoadingFrotas(false);
-      }
-    };
-    fetchFrotas();
-  }, []);
-
-  const handleNomeEmpresaChange = (val: string) => {
-    setNomeEmpresa(val);
-    localStorage.setItem('recuperar_nome_empresa', val);
   };
 
   // Obter itens da lista de compras do localStorage para incluir no backup
@@ -425,109 +334,58 @@ export default function BackupView({
             </div>
           )}
 
-          {/* SEÇÃO PRINCIPAL DE SINCRONIZAÇÃO EM NUVEM (RECUPERAR CLOUD SYNC) */}
+          {/* SEÇÃO PRINCIPAL DE SINCRONIZAÇÃO EM NUVEM (EXPORTAR/IMPORTAR CLOUD SYNC) */}
           <div className="bg-[#020617] border border-sky-500/30 rounded-xl p-5 shadow-inner space-y-4">
             <div className="flex items-center gap-2.5">
               <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
                 <Cloud className="w-5 h-5 animate-pulse" />
               </div>
               <div>
-                <h3 className="font-display font-bold text-white text-sm uppercase tracking-wider">RECUPERAR — Sincronização em Nuvem</h3>
-                <p className="text-[11px] text-slate-400">Salve seus dados na nuvem e recupere instantaneamente em qualquer aparelho celular se limpar o Chrome.</p>
+                <h3 className="font-display font-bold text-white text-sm uppercase tracking-wider">Backups registrados na nuvem</h3>
+                <p className="text-[11px] text-slate-400">Exporte ou importe seu backup na nuvem de forma simples e rápida.</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Nome da Empresa / Seu Nome</label>
-                <input
-                  type="text"
-                  maxLength={40}
-                  value={nomeEmpresa}
-                  onChange={(e) => handleNomeEmpresaChange(e.target.value)}
-                  placeholder="Ex: Transportadora FrigoSul"
-                  className="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 font-medium"
-                />
-                <p className="text-[10px] text-slate-500 mt-1">Identifica sua frota facilmente em caso de perda de cache do Chrome.</p>
+            <div className="space-y-3">
+              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Selecione um Backup</label>
+              <div className="flex gap-2">
+                <select
+                  value={selectedBackupIndex ?? ""}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setSelectedBackupIndex(val !== "" ? Number(val) : null);
+                  }}
+                  className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-sky-400 font-semibold focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 cursor-pointer"
+                >
+                  <option value="">-- Selecione um Backup --</option>
+                  {backupsNuvem.map((b, idx) => (
+                    <option key={b.id || idx} value={idx}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={fetchBackupsNuvem}
+                  disabled={loadingBackups}
+                  title="Atualizar lista de backups"
+                  className="bg-slate-800 hover:bg-slate-700 text-slate-350 p-2.5 rounded-lg border border-slate-700 transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loadingBackups ? 'animate-spin' : ''}`} />
+                </button>
               </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5">Código da sua Frota</label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    maxLength={15}
-                    value={codigoFrota}
-                    onChange={(e) => setCodigoFrota(e.target.value.toUpperCase().replace(/[^A-Z0-9-]/g, ''))}
-                    placeholder="Ex: FROTA-ABC"
-                    className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm font-mono font-bold text-sky-400 uppercase focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const rand = 'FR-' + Math.random().toString(36).substring(2, 8).toUpperCase();
-                      setCodigoFrota(rand);
-                    }}
-                    title="Gerar código aleatório"
-                    className="bg-slate-800 hover:bg-slate-700 text-slate-350 font-bold px-2.5 rounded-lg text-xs border border-slate-700 transition-colors cursor-pointer"
-                  >
-                    Gerar
-                  </button>
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">Insira um código para identificação exclusiva.</p>
-              </div>
-
-              <div className="flex flex-col justify-end">
-                <label className="flex items-center gap-2 cursor-pointer bg-[#1e293b]/40 p-2.5 rounded-lg border border-slate-800 hover:border-slate-700 transition-all">
-                  <input
-                    type="checkbox"
-                    checked={autoSync}
-                    onChange={(e) => setAutoSync(e.target.checked)}
-                    className="w-4 h-4 text-sky-400 bg-[#020617] border-slate-700 rounded focus:ring-sky-400 focus:ring-offset-[#1e293b]"
-                  />
-                  <div className="text-left">
-                    <p className="text-xs font-semibold text-slate-200">Sincronização Automática</p>
-                    <p className="text-[10px] text-slate-400">Salva na nuvem a cada alteração em tempo real</p>
-                  </div>
-                </label>
-              </div>
+              <p className="text-[10px] text-slate-500 font-medium">Selecione o backup desejado e clique no botão &quot;Importar Backup da Nuvem&quot; para restaurar todos os dados.</p>
             </div>
-
-            {frotasExistentes.length > 0 && (
-              <div className="border-t border-slate-800/85 pt-4 space-y-2">
-                <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Frotas já Registradas na Nuvem:</label>
-                <div className="flex gap-2">
-                  <select
-                    onChange={(e) => {
-                      const selectedCode = e.target.value;
-                      if (selectedCode) {
-                        setCodigoFrota(selectedCode);
-                        const matched = frotasExistentes.find(f => f.codigo === selectedCode);
-                        if (matched && matched.nomeEmpresa) {
-                          handleNomeEmpresaChange(matched.nomeEmpresa);
-                        }
-                      }
-                    }}
-                    className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-sky-400 font-semibold focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 cursor-pointer"
-                  >
-                    <option value="">-- Selecione uma Frota Registrada na Nuvem para preencher os campos --</option>
-                    {frotasExistentes.filter(f => f.codigo !== '_REGISTRY').map((f) => (
-                      <option key={f.codigo} value={f.codigo}>
-                        {f.nomeEmpresa ? `${f.nomeEmpresa} [${f.codigo}]` : f.codigo}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[10px] text-slate-500 font-medium">Selecione acima e clique no botão &quot;Recuperar Dados da Nuvem&quot; para restaurar.</p>
-              </div>
-            )}
 
             {/* Ações de sincronização */}
             <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
               <button
                 type="button"
-                onClick={() => onSincronizarComNuvem()}
-                disabled={syncStatus === 'syncing' || !codigoFrota.trim()}
+                onClick={async () => {
+                  await onSincronizarComNuvem();
+                  await fetchBackupsNuvem();
+                }}
+                disabled={syncStatus === 'syncing'}
                 className="flex-1 flex items-center justify-center gap-2 bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
               >
                 {syncStatus === 'syncing' ? (
@@ -535,24 +393,24 @@ export default function BackupView({
                 ) : (
                   <CloudLightning className="w-3.5 h-3.5" />
                 )}
-                Salvar Frota na Nuvem
+                Exportar Backup na Nuvem
               </button>
 
               <button
                 type="button"
-                onClick={() => onCarregarDaNuvem(codigoFrota)}
-                disabled={syncStatus === 'syncing' || !codigoFrota.trim()}
+                onClick={handleImportCloudBackup}
+                disabled={syncStatus === 'syncing' || selectedBackupIndex === null}
                 className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-sky-450" />
-                Recuperar Dados da Nuvem
+                Importar Backup da Nuvem
               </button>
             </div>
 
             {/* Status e Erros */}
             {syncStatus === 'syncing' && (
               <p className="text-xs text-sky-400 flex items-center gap-1.5 animate-pulse justify-center">
-                <Wifi className="w-3.5 h-3.5 animate-bounce" /> Comunicando com a nuvem RECUPERAR...
+                <Wifi className="w-3.5 h-3.5 animate-bounce" /> Comunicando com a nuvem...
               </p>
             )}
             {syncStatus === 'success' && (
@@ -587,94 +445,6 @@ export default function BackupView({
                 <div className="w-2 h-2 rounded-full bg-teal-500"></div>
                 <span className="text-slate-300">Lista Compras: <strong className="text-white">{shoppingListLength} itens</strong></span>
               </div>
-            </div>
-          </div>
-
-          {/* SEÇÃO DE BACKUP AUTOMÁTICO DE SÁBADO ÀS 21:00 */}
-          <div className="bg-[#020617]/40 border border-slate-800 rounded-xl p-4 sm:p-5 space-y-4">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg border border-emerald-500/20">
-                  <Clock className="w-4 h-4 animate-pulse" />
-                </div>
-                <div>
-                  <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Backup Automático Semanal</h3>
-                  <p className="text-[10px] text-slate-400">Ponto de restauração congelado todo Sábado às 21:00</p>
-                </div>
-              </div>
-
-              {/* Toggle Switch */}
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={autoBackupEnabled}
-                  onChange={(e) => handleToggleAutoBackup(e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-slate-850 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-slate-400 after:border-slate-350 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500 peer-checked:after:bg-slate-950 peer-checked:after:border-transparent"></div>
-                <span className="ml-2 text-xs font-semibold text-slate-300">
-                  {autoBackupEnabled ? 'Ativo' : 'Inativo'}
-                </span>
-              </label>
-            </div>
-
-            <p className="text-[11px] text-slate-400 leading-relaxed font-sans">
-              Com este recurso ativado, se o aplicativo estiver aberto ou quando você acessá-lo após o horário, o sistema gera automaticamente uma cópia congelada de segurança local para que você possa restaurá-la a qualquer momento em caso de perda de dados.
-            </p>
-
-            {/* Lista de Backups Automáticos */}
-            <div className="space-y-2 pt-1">
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Pontos de Restauração Salvos ({autoBackupsList.length}/10):</label>
-              
-              {autoBackupsList.length === 0 ? (
-                <div className="bg-[#1e293b]/25 border border-dashed border-slate-800 rounded-lg p-4 text-center text-xs text-slate-500 font-sans">
-                  Nenhum backup automático criado ainda. O sistema salvará uma cópia automaticamente no próximo sábado às 21:00 se houver dados ativos.
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
-                  {autoBackupsList.map((item: any) => (
-                    <div key={item.id} className="bg-[#1e293b]/45 border border-slate-800/80 p-3 rounded-lg flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-slate-700/60 transition-colors">
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>
-                          <p className="text-xs font-bold text-slate-200">Sábado, {item.data_referencia_sabado}</p>
-                        </div>
-                        <p className="text-[10px] text-slate-400 mt-1">
-                          {item.veiculos?.length || 0} Caminhões • {item.manutencoes?.length || 0} Manutenções • R$ {item.custoPadraoDiario || 150} diário
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-1.5 self-end sm:self-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRestoreAutoBackup(item)}
-                          className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer"
-                          title="Restaurar este ponto"
-                        >
-                          Restaurar
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDownloadAutoBackup(item)}
-                          className="bg-slate-800 hover:bg-slate-700 text-slate-350 hover:text-white border border-slate-700 px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer flex items-center gap-1"
-                          title="Baixar arquivo JSON"
-                        >
-                          <Download className="w-3 h-3 text-amber-500" />
-                          JSON
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAutoBackup(item.id)}
-                          className="bg-rose-950/35 hover:bg-rose-900/60 text-rose-400 px-2 py-1.5 rounded text-[10px] transition-all cursor-pointer"
-                          title="Excluir da lista"
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
 
