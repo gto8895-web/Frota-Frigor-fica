@@ -1010,7 +1010,6 @@ export default function VehiclesView({
                 placeholder="Ex: Sanden SD7H15"
                 value={compressor}
                 onChange={(e) => setCompressor(e.target.value)}
-                required
               />
             </div>
 
@@ -1023,7 +1022,6 @@ export default function VehiclesView({
                 placeholder="Ex: PK 1090"
                 value={correia}
                 onChange={(e) => setCorreia(e.target.value)}
-                required
               />
             </div>
 
