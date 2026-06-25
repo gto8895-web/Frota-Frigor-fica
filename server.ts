@@ -246,13 +246,40 @@ async function startServer() {
   });
 
   // Endpoint para recuperar o código de frota ativo salvo no servidor
-  app.get("/api/sync/active-code", (req, res) => {
+  app.get("/api/sync/active-code", async (req, res) => {
     try {
       const filePath = path.join(DATA_DIR, "active_code.txt");
       if (fs.existsSync(filePath)) {
         const codigoFrota = fs.readFileSync(filePath, "utf8").trim();
-        return res.json({ success: true, codigoFrota });
+        if (codigoFrota) {
+          return res.json({ success: true, codigoFrota });
+        }
       }
+
+      // Fallback robusto: carregar o registro central e obter a última frota atualizada
+      console.log("[Active Code API] Arquivo active_code.txt não existe ou está vazio. Buscando última frota no _REGISTRY...");
+      const registry = await loadFromFirestoreREST("_REGISTRY");
+      if (registry && Array.isArray(registry.frotas) && registry.frotas.length > 0) {
+        // Ordena por updatedAt decrescente
+        const sorted = [...registry.frotas].sort((a: any, b: any) => {
+          const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+          const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+          return dateB - dateA;
+        });
+
+        const ultimaFrota = sorted[0].codigo;
+        console.log("[Active Code API] Retornando última frota ativa do registro central:", ultimaFrota);
+
+        // Grava de volta localmente para cache
+        try {
+          fs.writeFileSync(filePath, ultimaFrota, "utf8");
+        } catch (err) {
+          console.warn("[Active Code API] Falha ao salvar active_code.txt:", err);
+        }
+
+        return res.json({ success: true, codigoFrota: ultimaFrota });
+      }
+
       res.json({ success: true, codigoFrota: null });
     } catch (error: any) {
       console.error("Erro ao obter código ativo:", error);

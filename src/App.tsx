@@ -670,16 +670,11 @@ export default function App() {
     }
 
     if (autoSync && codigoFrota) {
-      // Evita salvar automaticamente se a lista de manutenção estiver zerada ou com dados padrão (modelo)
-      if (isManutencoesZerada()) {
-        console.log('[AutoSync] Ignorado porque a lista de manutenção está zerada ou contém dados padrão (modelo). Protegendo backup na nuvem contra sobrescrita vazia.');
-        return;
-      }
       const timer = setTimeout(() => {
         // Atualiza o ref antes de chamar sincronizarComNuvem para evitar chamadas duplicadas
         lastSyncedDataRef.current = currentDataStr;
         sincronizarComNuvem(undefined, true);
-      }, 2000);
+      }, 500); // Debounce curto de 500ms para salvar instantaneamente a cada modificação
       return () => clearTimeout(timer);
     }
   }, [
@@ -730,6 +725,7 @@ export default function App() {
 
         const cleanCode = activeCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
         setCodigoFrota(cleanCode);
+        localStorage.setItem('recuperar_codigo_frota', cleanCode);
 
         // 2. Tentar carregar dados em tempo real (live) ou backups do Firestore
         console.log(`[Init] Buscando dados da nuvem para o código: ${cleanCode}...`);
@@ -869,81 +865,6 @@ export default function App() {
 
     inicializarApp();
   }, []);
-
-  // 2. Salvar em tempo real (live) na Nuvem (Firestore) sempre que houver qualquer alteração nos dados
-  useEffect(() => {
-    if (isInitializing || !codigoFrota) return;
-
-    const currentData = {
-      veiculos,
-      manutencoes,
-      custoPadraoDiario,
-      shoppingList,
-      avarias,
-      opcoesManutencao
-    };
-
-    const currentDataStr = JSON.stringify(currentData);
-
-    // Se não mudou os dados em relação ao último sincronizado, não salva
-    if (currentDataStr === lastSyncedDataRef.current) {
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      lastSyncedDataRef.current = currentDataStr;
-      
-      const cleanCode = codigoFrota.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
-      if (!cleanCode) return;
-
-      setSyncStatus('syncing');
-      try {
-        const docRef = doc(db, 'frotas', cleanCode);
-        const docSnap = await getDoc(docRef);
-        let existingDocData: any = {};
-        if (docSnap.exists()) {
-          existingDocData = docSnap.data() || {};
-        }
-
-        const dataToSave = {
-          ...existingDocData,
-          live: currentData,
-          updatedAt: new Date().toISOString()
-        };
-
-        await setDoc(docRef, dataToSave);
-
-        // Atualização redundante do servidor Express local
-        try {
-          await fetch('/api/sync/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ codigoFrota: cleanCode, dados: dataToSave }),
-          });
-        } catch (srvErr) {
-          console.warn("Salvamento redundante no servidor Express falhou:", srvErr);
-        }
-
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 2000);
-      } catch (err: any) {
-        console.error("Erro ao salvar live no Firestore:", err);
-        setSyncStatus('error');
-        setSyncError(err.message || 'Erro ao sincronizar dados em tempo real na nuvem.');
-      }
-    }, 1000); // 1s de debounce para evitar excesso de escritas no Firestore
-
-    return () => clearTimeout(timer);
-  }, [
-    veiculos,
-    manutencoes,
-    custoPadraoDiario,
-    shoppingList,
-    avarias,
-    opcoesManutencao,
-    codigoFrota,
-    isInitializing
-  ]);
 
   if (isInitializing) {
     return (
