@@ -515,138 +515,134 @@ export default function BackupView({
             </div>
           )}
 
-          {/* SEÇÃO DE CÓDIGO DA OFICINA / VINCULAR CONTA ANTERIOR */}
-          <div className="bg-[#020617]/40 border border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg border border-amber-500/20">
-                <Database className="w-4 h-4 shrink-0" />
+          {/* SEÇÃO PRINCIPAL: BACKUPS MANUAIS (NUVEM E ARQUIVO LOCAL) */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            
+            {/* CARD 1: BACKUP MANUAL NA NUVEM */}
+            <div className="bg-[#020617]/50 border border-slate-800 rounded-xl p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
+                    <Cloud className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Cópia Manual na Nuvem</h3>
+                    <p className="text-[10px] text-slate-400">Salve ou recupere uma cópia segura nos servidores da nuvem de forma instantânea.</p>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-300 space-y-1 bg-slate-900/40 p-3 rounded-lg border border-slate-800/60">
+                  <p>• Salva o estado atual na sua conta.</p>
+                  <p>• Ideal para sincronizar com outros celulares.</p>
+                  <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
+                    <span>Código da Oficina:</span>
+                    <strong className="text-sky-400 font-mono">{codigoFrota || 'NÃO CONFIGURADO'}</strong>
+                  </div>
+                </div>
               </div>
-              <div>
-                <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Vincular Código da Oficina (Recuperar Conta)</h3>
-                <p className="text-[11px] text-slate-400">Insira seu código de backup da nuvem anterior caso você tenha limpo os dados do Chrome.</p>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    if (window.confirm("Deseja exportar seus dados atuais manualmente para a nuvem? Isso salvará o estado atual.")) {
+                      await onSincronizarComNuvem();
+                      await fetchBackupsNuvem();
+                    }
+                  }}
+                  disabled={syncStatus === 'syncing'}
+                  className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {syncStatus === 'syncing' ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <CloudLightning className="w-3.5 h-3.5" />
+                  )}
+                  Exportar para Nuvem
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleImportCloudBackup}
+                  disabled={syncStatus === 'syncing' || loadingBackups}
+                  className="w-full flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
+                >
+                  <Download className="w-3.5 h-3.5 text-sky-450" />
+                  Importar da Nuvem
+                </button>
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3">
-              <div className="flex-1">
+            {/* CARD 2: BACKUP MANUAL EM ARQUIVO JSON */}
+            <div className="bg-[#020617]/50 border border-slate-800 rounded-xl p-5 flex flex-col justify-between space-y-4">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2.5">
+                  <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg border border-amber-500/20">
+                    <Database className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Cópia Manual em Arquivo</h3>
+                    <p className="text-[10px] text-slate-400">Baixe um arquivo de dados (.json) no celular ou envie um arquivo para restaurar.</p>
+                  </div>
+                </div>
+
+                <div className="text-[11px] text-slate-300 space-y-1 bg-slate-900/40 p-3 rounded-lg border border-slate-800/60">
+                  <p>• Baixa um arquivo físico para o seu aparelho.</p>
+                  <p>• Funciona totalmente offline, sem internet.</p>
+                  <div className="pt-1.5 border-t border-slate-800 text-[10px] text-slate-400 text-center">
+                    Cópia 100% física, privada e autônoma
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-2">
+                <button
+                  type="button"
+                  onClick={handleExportBackup}
+                  className="w-full flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Download className="w-3.5 h-3.5 text-amber-500" />
+                  Exportar Arquivo JSON
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleImportClick}
+                  className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-500 text-white font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  Importar Arquivo JSON
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* ÁREA SECUNDÁRIA: ALTERAR CÓDIGO DA OFICINA SE NECESSÁRIO */}
+          <div className="bg-[#020617]/20 border border-slate-800/80 rounded-xl p-4 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-semibold text-white">Alterar Código de Sincronização</h4>
+                <p className="text-[10px] text-slate-500">Mude seu código apenas se desejar conectar a outra oficina existente.</p>
+              </div>
+              <div className="flex gap-2 w-full sm:w-auto">
                 <input
                   type="text"
                   value={tempCode}
                   onChange={(e) => setTempCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
-                  placeholder="EX: FRIGO-XXXXXX"
-                  className="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold uppercase focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                  placeholder="CÓDIGO"
+                  className="bg-[#1e293b] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold uppercase w-full sm:w-32 focus:outline-none focus:border-sky-400"
                 />
-              </div>
-              <button
-                type="button"
-                onClick={handleVincularCodigo}
-                disabled={syncStatus === 'syncing' || loadingBackups}
-                className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-55"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${loadingBackups ? 'animate-spin' : ''}`} />
-                Vincular &amp; Conectar
-              </button>
-            </div>
-            
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-slate-500 border-t border-slate-800/65 pt-2 font-medium">
-              <span>
-                Código ativo atual: <strong className="text-sky-400 font-mono text-[11px]">{codigoFrota || 'NENHUM'}</strong>
-              </span>
-              <span>
-                ⚠️ Mudar o código atualizará os backups exibidos abaixo.
-              </span>
-            </div>
-          </div>
-
-          {/* SEÇÃO PRINCIPAL DE SINCRONIZAÇÃO EM NUVEM (EXPORTAR/IMPORTAR CLOUD SYNC) */}
-          <div className="bg-[#020617] border border-sky-500/30 rounded-xl p-5 shadow-inner space-y-4">
-            <div className="flex items-center gap-2.5">
-              <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
-                <Cloud className="w-5 h-5 animate-pulse" />
-              </div>
-              <div>
-                <h3 className="font-display font-bold text-white text-sm uppercase tracking-wider">Backups registrados na nuvem</h3>
-                <p className="text-[11px] text-slate-400">Exporte ou importe seu backup na nuvem de forma simples e rápida.</p>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider">Selecione um Backup</label>
-              <div className="flex gap-2">
-                <select
-                  value={selectedBackupIndex ?? ""}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setSelectedBackupIndex(val !== "" ? Number(val) : null);
-                  }}
-                  className="flex-1 bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2.5 text-sm text-sky-400 font-semibold focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400 cursor-pointer"
-                >
-                  <option value="">-- Selecione um Backup --</option>
-                  {backupsNuvem.map((b, idx) => (
-                    <option key={b.id || idx} value={idx}>
-                      {b.label}
-                    </option>
-                  ))}
-                </select>
                 <button
                   type="button"
-                  onClick={fetchBackupsNuvem}
-                  disabled={loadingBackups}
-                  title="Atualizar lista de backups"
-                  className="bg-slate-800 hover:bg-slate-700 text-slate-350 p-2.5 rounded-lg border border-slate-700 transition-colors cursor-pointer flex items-center justify-center shrink-0"
+                  onClick={handleVincularCodigo}
+                  disabled={syncStatus === 'syncing' || loadingBackups}
+                  className="bg-sky-500/10 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
                 >
-                  <RefreshCw className={`w-4 h-4 ${loadingBackups ? 'animate-spin' : ''}`} />
+                  Vincular
                 </button>
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">Selecione o backup desejado e clique no botão &quot;Importar Backup da Nuvem&quot; para restaurar todos os dados.</p>
             </div>
-
-            {/* Ações de sincronização */}
-            <div className="flex flex-col sm:flex-row gap-2.5 pt-1">
-              <button
-                type="button"
-                onClick={async () => {
-                  await onSincronizarComNuvem();
-                  await fetchBackupsNuvem();
-                }}
-                disabled={syncStatus === 'syncing'}
-                className="flex-1 flex items-center justify-center gap-2 bg-sky-400 hover:bg-sky-300 disabled:opacity-50 text-slate-950 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
-              >
-                {syncStatus === 'syncing' ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CloudLightning className="w-3.5 h-3.5" />
-                )}
-                Exportar Backup na Nuvem
-              </button>
-
-              <button
-                type="button"
-                onClick={handleImportCloudBackup}
-                disabled={syncStatus === 'syncing' || loadingBackups}
-                className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-sky-450" />
-                Importar Backup da Nuvem
-              </button>
-            </div>
-
-            {/* Status e Erros */}
-            {syncStatus === 'syncing' && (
-              <p className="text-xs text-sky-400 flex items-center gap-1.5 animate-pulse justify-center">
-                <Wifi className="w-3.5 h-3.5 animate-bounce" /> Comunicando com a nuvem...
-              </p>
-            )}
-            {syncStatus === 'success' && (
-              <p className="text-xs text-emerald-400 flex items-center gap-1.5 justify-center font-semibold">
-                <ShieldCheck className="w-4 h-4 animate-bounce" /> Operação realizada e salva em nuvem com sucesso!
-              </p>
-            )}
-            {syncStatus === 'error' && (
-              <p className="text-xs text-rose-400 flex items-center gap-1.5 justify-center font-semibold text-center">
-                <AlertTriangle className="w-4 h-4 shrink-0" /> {syncError || 'Falha ao sincronizar com a nuvem.'}
-              </p>
-            )}
           </div>
 
           {/* Resumo da base atual */}
@@ -673,45 +669,18 @@ export default function BackupView({
           </div>
 
           <div className="text-xs text-slate-400 space-y-1.5 leading-relaxed">
-            <p>💡 <strong className="text-slate-300">Importante:</strong> Ao fazer a importação de um backup anterior, as informações atualmente inseridas no aplicativo serão <strong className="text-amber-400">substituídas</strong> pelos dados do arquivo.</p>
+            <p>💡 <strong className="text-slate-300">Importante:</strong> Ao fazer a importação de um backup anterior, as informações atualmente inseridas no aplicativo serão <strong className="text-amber-400">substituídas</strong> pelos dados do arquivo ou nuvem.</p>
             <p>📂 O arquivo gerado está no formato JSON padronizado e seguro, sem risco de expor suas senhas ou contas.</p>
           </div>
 
-          {/* Compartimento de Botões de Ação */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-            {/* Botão de Exportar */}
-            <button
-              onClick={handleExportBackup}
-              className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-slate-800 to-slate-700 hover:from-slate-700 hover:to-slate-600 text-white font-bold text-sm px-6 py-4 rounded-xl transition-all shadow-md cursor-pointer border border-slate-700"
-            >
-              <Download className="w-5 h-5 text-amber-500" />
-              <div className="text-left">
-                <p>Exportar Backup</p>
-                <p className="text-[10px] text-slate-400 font-normal">Baixar dados em arquivo JSON</p>
-              </div>
-            </button>
-
-            {/* Botão de Importar */}
-            <button
-              onClick={handleImportClick}
-              className="flex items-center justify-center gap-2.5 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-white font-bold text-sm px-6 py-4 rounded-xl transition-all shadow-md cursor-pointer border border-transparent shadow-amber-500/10"
-            >
-              <Upload className="w-5 h-5" />
-              <div className="text-left">
-                <p>Importar Backup</p>
-                <p className="text-[10px] text-amber-100 font-normal">Restaurar dados de arquivo JSON</p>
-              </div>
-            </button>
-
-            {/* Input File off-screen altamente compatível com todos os celulares e navegadores */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".json,application/json,text/plain"
-              className="sr-only"
-            />
-          </div>
+          {/* Input File off-screen altamente compatível com todos os celulares e navegadores */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            accept=".json,application/json,text/plain"
+            className="sr-only"
+          />
 
 
         </div>
