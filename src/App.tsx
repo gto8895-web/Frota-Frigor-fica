@@ -495,6 +495,12 @@ export default function App() {
     const cod = codigoOverride || codigoFrota;
     if (!cod.trim()) return;
 
+    if (manutencoes.length === 0) {
+      console.log('[Sync] Sincronização cancelada porque a lista de manutenção está zerada (evitando sobrescrever backup válido).');
+      setSyncStatus('idle');
+      return;
+    }
+
     setSyncStatus('syncing');
     setSyncError(null);
 
@@ -770,9 +776,9 @@ export default function App() {
     }
 
     if (autoSync && codigoFrota) {
-      // Evita salvar automaticamente se a frota estiver totalmente vazia no início
-      if (veiculos.length === 0 && manutencoes.length === 0) {
-        console.log('[AutoSync] Ignorado porque a frota está vazia. Protegendo backup na nuvem.');
+      // Evita salvar automaticamente se a lista de manutenção estiver zerada
+      if (manutencoes.length === 0) {
+        console.log('[AutoSync] Ignorado porque a lista de manutenção está zerada. Protegendo backup na nuvem contra sobrescrita vazia.');
         return;
       }
       const timer = setTimeout(() => {
@@ -856,12 +862,17 @@ export default function App() {
 
             // Se conseguimos recuperar os dados de alguma das fontes, restauramos!
             if (parsedData) {
-              const cloudVeic = parsedData.veiculos;
-              const cloudMaint = parsedData.manutencoes;
-              const cloudCusto = parsedData.custoPadraoDiario;
-              const shoppingList = parsedData.shopping_list || parsedData.shoppingList;
-              const avarias = parsedData.avarias;
-              const opcoesManutencao = parsedData.opcoesManutencao;
+              let activeBackup = parsedData;
+              if (parsedData && Array.isArray(parsedData.backups) && parsedData.backups.length > 0) {
+                activeBackup = parsedData.backups[0]; // Restaura o mais recente (último lançado)
+              }
+
+              const cloudVeic = activeBackup.veiculos;
+              const cloudMaint = activeBackup.manutencoes;
+              const cloudCusto = activeBackup.custoPadraoDiario;
+              const shoppingList = activeBackup.shopping_list || activeBackup.shoppingList;
+              const avarias = activeBackup.avarias;
+              const opcoesManutencao = activeBackup.opcoesManutencao;
 
               if (cloudVeic) {
                 setVeiculos(cloudVeic);
@@ -876,12 +887,15 @@ export default function App() {
                 localStorage.setItem('ff_custo_diario', String(cloudCusto));
               }
               if (shoppingList) {
+                setShoppingList(shoppingList);
                 localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
               }
               if (avarias) {
+                setAvarias(avarias);
                 localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
               }
               if (opcoesManutencao) {
+                setOpcoesManutencao(opcoesManutencao);
                 localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
               }
 
@@ -932,6 +946,92 @@ export default function App() {
 
     inicializarApp();
   }, []);
+
+  // Se a lista de manutenção estiver zerada localmente, baixar automaticamente os backups da nuvem e restaurar o mais recente
+  useEffect(() => {
+    if (isInitializing) return;
+    
+    const baixarERestaurarUltimoBackupSeZerado = async () => {
+      if (!codigoFrota || manutencoes.length > 0) return;
+
+      console.log('[AutoImport] Lista de manutenção está zerada. Tentando baixar e restaurar o último backup da nuvem de:', codigoFrota);
+      try {
+        const cleanCode = codigoFrota.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        if (!cleanCode) return;
+
+        // Tenta buscar no Firestore
+        const docRef = doc(db, 'frotas', cleanCode);
+        const docSnap = await getDoc(docRef);
+        let parsed: any = null;
+
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          if (docData && docData.dados) {
+            parsed = JSON.parse(docData.dados);
+          }
+        }
+
+        // Fallback Express se não achar pelo SDK
+        if (!parsed) {
+          const res = await fetch(`/api/sync/load/${cleanCode}`);
+          if (res.ok) {
+            const loadData = await res.json();
+            if (loadData.success && loadData.dados) {
+              parsed = loadData.dados;
+            }
+          }
+        }
+
+        if (parsed) {
+          let b: any = null;
+          if (Array.isArray(parsed.backups) && parsed.backups.length > 0) {
+            b = parsed.backups[0]; // O último backup lançado na nuvem (o mais recente)
+          } else if (parsed.veiculos) {
+            b = parsed;
+          }
+
+          if (b && Array.isArray(b.manutencoes) && b.manutencoes.length > 0) {
+            console.log('[AutoImport] Backup localizado e válido. Importando automaticamente:', b.label || b.id);
+            
+            setVeiculos(b.veiculos || []);
+            localStorage.setItem('ff_veiculos', JSON.stringify(b.veiculos || []));
+
+            setManutencoes(b.manutencoes || []);
+            localStorage.setItem('ff_manutencoes', JSON.stringify(b.manutencoes || []));
+
+            setCustoPadraoDiario(b.custoPadraoDiario || 150);
+            localStorage.setItem('ff_custo_diario', String(b.custoPadraoDiario || 150));
+
+            if (b.shopping_list) {
+              setShoppingList(b.shopping_list);
+              localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
+            }
+            if (b.avarias) {
+              setAvarias(b.avarias);
+              localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
+            }
+            
+            const listToSave = b.opcoesManutencao || [];
+            if (listToSave.length > 0) {
+              setOpcoesManutencao(listToSave);
+              localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
+            }
+
+            // Forçar recarga após importar para recarregar subcomponentes e dashboards
+            setTimeout(() => {
+              window.location.reload();
+            }, 800);
+          } else {
+            console.log('[AutoImport] Nenhum backup com manutenções encontrado na nuvem para recuperar automaticamente.');
+          }
+        }
+      } catch (err) {
+        console.error('[AutoImport] Erro ao recuperar backup automaticamente para lista zerada:', err);
+      }
+    };
+
+    baixarERestaurarUltimoBackupSeZerado();
+  }, [codigoFrota, isInitializing, manutencoes.length]);
 
   if (isInitializing) {
     return (
