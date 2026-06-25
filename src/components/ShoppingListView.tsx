@@ -10,22 +10,12 @@ interface ShoppingItem {
 
 interface ShoppingListViewProps {
   onBack: () => void;
+  shoppingItems: ShoppingItem[];
+  setShoppingItems: React.Dispatch<React.SetStateAction<ShoppingItem[]>>;
 }
 
-export default function ShoppingListView({ onBack }: ShoppingListViewProps) {
-  const [shoppingItems, setShoppingItems] = useState<ShoppingItem[]>(() => {
-    const saved = localStorage.getItem('frigofrota_shopping_list');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Gás Refrigerante R404A', completed: false },
-      { id: '2', name: 'Filtro secador Thermo King', completed: false },
-      { id: '3', name: 'Óleo lubrificante sintético ISO 68', completed: true }
-    ];
-  });
+export default function ShoppingListView({ onBack, shoppingItems, setShoppingItems }: ShoppingListViewProps) {
   const [newItemName, setNewItemName] = useState('');
-
-  useEffect(() => {
-    localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingItems));
-  }, [shoppingItems]);
 
   const handleAddItem = (e: React.FormEvent) => {
     e.preventDefault();

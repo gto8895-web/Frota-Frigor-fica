@@ -13,6 +13,8 @@ interface BackupViewProps {
     manutencoes: Manutencao[];
     custoPadraoDiario: number;
     shopping_list?: any[];
+    avarias?: any;
+    opcoesManutencao?: string[];
   }) => void;
   onClearHistoryAndAvarias?: () => void;
   onBack: () => void;
@@ -101,7 +103,9 @@ export default function BackupView({
         veiculos: b.veiculos || [],
         manutencoes: b.manutencoes || [],
         custoPadraoDiario: b.custoPadraoDiario || 150,
-        shopping_list: b.shopping_list || []
+        shopping_list: b.shopping_list || [],
+        avarias: b.avarias || {},
+        opcoesManutencao: b.opcoesManutencao || []
       });
 
       if (b.shopping_list) {
@@ -115,7 +119,7 @@ export default function BackupView({
       if (listToSave.length > 0) {
         localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
       } else {
-        localStorage.removeItem('frigofrota_opcoes_manutencao');
+        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify([]));
       }
 
       setStatusMessage({
@@ -232,7 +236,9 @@ export default function BackupView({
           veiculos: parsed.veiculos,
           manutencoes: parsed.manutencoes,
           custoPadraoDiario: parsed.custoPadraoDiario || 150,
-          shopping_list: Array.isArray(parsed.shopping_list) ? parsed.shopping_list : []
+          shopping_list: Array.isArray(parsed.shopping_list) ? parsed.shopping_list : [],
+          avarias: parsed.avarias || {},
+          opcoesManutencao: parsed.opcoesManutencao || []
         });
 
         // Caso haja itens da lista de compras, salvar no localStorage

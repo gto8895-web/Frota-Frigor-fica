@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Veiculo, Manutencao, StatusManutencao } from '../types';
 import { Wrench, Trash2, Calendar, Filter, Pencil } from 'lucide-react';
+import { LogoMarca } from './VehiclesView';
 
 // Brazilian License Plate Component
 export function PlacaMercosul({ placa }: { placa: string }) {
@@ -43,6 +44,7 @@ interface MaintenanceViewProps {
 
 interface GroupedManutencao extends Manutencao {
   idsOriginais: string[];
+  descricoes: string[];
 }
 
 export default function MaintenanceView({
@@ -73,11 +75,13 @@ export default function MaintenanceView({
       // Ordenação estável por ID descentente para definir o principal do grupo
       const ordinario = [...membros].sort((a, b) => b.id.localeCompare(a.id));
       const principal = ordinario[0];
+      const descricoesLimpas = ordinario.map(item => item.descricao.trim());
 
       if (ordinario.length === 1) {
         return {
           ...principal,
-          idsOriginais: [principal.id]
+          idsOriginais: [principal.id],
+          descricoes: [principal.descricao.trim()]
         };
       }
 
@@ -85,7 +89,6 @@ export default function MaintenanceView({
       const custoTotal = ordinario.length > 0 ? Math.max(...ordinario.map(item => item.custo)) : 0;
 
       // Concatena descrições com " • "
-      const descricoesLimpas = ordinario.map(item => item.descricao.trim());
       const descricaoConsolidada = descricoesLimpas.join(' • ');
 
       // Consolidar status
@@ -103,7 +106,8 @@ export default function MaintenanceView({
         descricao: descricaoConsolidada,
         custo: custoTotal,
         status: statusConsolidado,
-        idsOriginais: ordinario.map(item => item.id)
+        idsOriginais: ordinario.map(item => item.id),
+        descricoes: descricoesLimpas
       };
     });
   };
@@ -211,20 +215,28 @@ export default function MaintenanceView({
                     #{numRegistro.toString().padStart(2, '0')}
                   </div>
                   
-                  <div className="space-y-1 min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xxs font-mono font-semibold text-slate-400 bg-slate-950/40 px-2 py-0.5 rounded border border-slate-800/40">
-                        {formatarDataBR(m.data)}{m.hora ? ` às ${m.hora.substring(0, 5)}` : ''}
-                      </span>
-                      {veiculo && (
-                        <span className="text-xxs font-bold bg-sky-950/40 text-sky-400 px-2 py-0.5 rounded border border-sky-800/30">
-                          {veiculo.placa} • {veiculo.marcaCaminhao} {veiculo.modelo}
+                     <div className="flex flex-col gap-2 w-full">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xxs font-mono font-semibold text-slate-400 bg-slate-950/40 px-2 py-0.5 rounded border border-slate-800/40">
+                          {formatarDataBR(m.data)}{m.hora ? ` às ${m.hora.substring(0, 5)}` : ''}
                         </span>
+                      </div>
+                      
+                      {veiculo && (
+                        <div className="flex items-center gap-3 bg-slate-950/40 p-2.5 rounded-xl border border-slate-800/60 w-fit max-w-full">
+                          <PlacaMercosul placa={veiculo.placa} />
+                          <div className="flex flex-col min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <LogoMarca marca={veiculo.marcaCaminhao} className="w-3.5 h-3.5 text-sky-400" />
+                              <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">{veiculo.marcaCaminhao}</span>
+                            </div>
+                            <span className="text-xs font-semibold text-white truncate">{veiculo.modelo}</span>
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    
-                    {editandoId === m.id ? (
-                      <div className="flex flex-col gap-2 mt-1 w-full max-w-lg">
+                      
+                      {editandoId === m.id ? (
+                      <div className="flex flex-col gap-2 mt-2 w-full max-w-lg">
                         <textarea
                           className="w-full bg-[#020617] border border-slate-700 rounded-lg p-2 text-xs focus:outline-none focus:border-sky-500 text-slate-100 font-sans"
                           value={editandoDescricao}
@@ -291,9 +303,23 @@ export default function MaintenanceView({
                         </div>
                       </div>
                     ) : (
-                      <p className="text-sm font-medium text-slate-105 font-sans break-words text-slate-100">
-                        {m.descricao}
-                      </p>
+                      <div className="py-2.5">
+                        <span className="block text-[10px] font-bold text-slate-450 uppercase tracking-widest mb-1.5">Serviços Executados:</span>
+                        {m.descricoes && m.descricoes.length > 0 ? (
+                          <ul className="space-y-1.5 pl-1.5 text-sm text-slate-200 font-sans border-l-2 border-sky-500/20">
+                            {m.descricoes.map((desc, idx) => (
+                              <li key={idx} className="break-words flex items-start gap-2">
+                                <span className="text-sky-400 select-none mt-1 text-[10px]">•</span>
+                                <span className="font-medium text-slate-100">{desc}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm font-medium text-slate-100 font-sans break-words pl-1.5 border-l-2 border-sky-500/20">
+                            {m.descricao}
+                          </p>
+                        )}
+                      </div>
                     )}
 
                     <div className="flex items-center gap-3 text-[11px] text-slate-400">

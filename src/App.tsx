@@ -92,6 +92,59 @@ export default function App() {
     return saved !== 'false'; // Sincronização automática ativa por padrão
   });
 
+  // Novos estados centralizados de dados para detecção precisa de backup
+  const [avarias, setAvarias] = useState<any>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_avarias');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const [opcoesManutencao, setOpcoesManutencao] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_opcoes_manutencao');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [
+      'Troca de Correia',
+      'Troca de Ventilador',
+      'Carga de Gás',
+      'Troca do Compressor',
+      'Troca Chicote Elétrico',
+      'Troca de Válvula'
+    ];
+  });
+
+  const [shoppingList, setShoppingList] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem('frigofrota_shopping_list');
+      return saved ? JSON.parse(saved) : [
+        { id: '1', name: 'Gás Refrigerante R404A', completed: false },
+        { id: '2', name: 'Filtro secador Thermo King', completed: false },
+        { id: '3', name: 'Óleo lubrificante sintético ISO 68', completed: true }
+      ];
+    } catch {
+      return [];
+    }
+  });
+
+  const lastSyncedDataRef = React.useRef<string>('');
+
+  // Sincronizadores locais de estados para localStorage
+  useEffect(() => {
+    localStorage.setItem('frigofrota_avarias', JSON.stringify(avarias));
+  }, [avarias]);
+
+  useEffect(() => {
+    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoesManutencao));
+  }, [opcoesManutencao]);
+
+  useEffect(() => {
+    localStorage.setItem('frigofrota_shopping_list', JSON.stringify(shoppingList));
+  }, [shoppingList]);
+
   const [currentTime, setCurrentTime] = useState<string>(() => {
     const now = new Date();
     return now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -406,6 +459,9 @@ export default function App() {
     veiculos: Veiculo[];
     manutencoes: Manutencao[];
     custoPadraoDiario: number;
+    shopping_list?: any[];
+    avarias?: any;
+    opcoesManutencao?: string[];
   }) => {
     localStorage.setItem('ff_veiculos', JSON.stringify(data.veiculos));
     localStorage.setItem('ff_manutencoes', JSON.stringify(data.manutencoes));
@@ -413,12 +469,25 @@ export default function App() {
     setVeiculos(data.veiculos);
     setManutencoes(data.manutencoes);
     setCustoPadraoDiario(data.custoPadraoDiario);
+    if (data.shopping_list) {
+      setShoppingList(data.shopping_list);
+      localStorage.setItem('frigofrota_shopping_list', JSON.stringify(data.shopping_list));
+    }
+    if (data.avarias) {
+      setAvarias(data.avarias);
+      localStorage.setItem('frigofrota_avarias', JSON.stringify(data.avarias));
+    }
+    if (data.opcoesManutencao) {
+      setOpcoesManutencao(data.opcoesManutencao);
+      localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(data.opcoesManutencao));
+    }
   };
 
   const handleClearHistoryAndAvarias = () => {
     setManutencoes([]);
     localStorage.setItem('ff_manutencoes', JSON.stringify([]));
-    localStorage.setItem('frigofruns_avarias', JSON.stringify({}));
+    setAvarias({});
+    localStorage.setItem('frigofrota_avarias', JSON.stringify({}));
   };
 
   // Sincronização em nuvem (RECUPERAR)
@@ -469,9 +538,9 @@ export default function App() {
       veiculos,
       manutencoes,
       custoPadraoDiario,
-      shopping_list: safeGetLocalStorage('frigofrota_shopping_list', []),
-      avarias: safeGetLocalStorage('frigofrota_avarias', {}),
-      opcoesManutencao: safeGetLocalStorage('frigofrota_opcoes_manutencao', [])
+      shopping_list: shoppingList,
+      avarias: avarias,
+      opcoesManutencao: opcoesManutencao
     };
 
     try {
@@ -509,7 +578,13 @@ export default function App() {
       }
 
       // Adiciona o novo backup no topo
-      const updatedBackups = [novoBackup, ...backupsExistentes];
+      // Se for automático (isAuto: true), e o último backup (o primeiro do array) também for automático, substituímos!
+      let updatedBackups;
+      if (isAuto && backupsExistentes.length > 0 && backupsExistentes[0].isAuto) {
+        updatedBackups = [novoBackup, ...backupsExistentes.slice(1)];
+      } else {
+        updatedBackups = [novoBackup, ...backupsExistentes];
+      }
       // Limita a 5 backups
       const finalBackups = updatedBackups.slice(0, 5);
 
@@ -642,14 +717,17 @@ export default function App() {
       localStorage.setItem('ff_custo_diario', String(custo));
 
       const listToSave = activeBackup.shopping_list || activeBackup.shoppingList || [];
+      setShoppingList(listToSave);
       localStorage.setItem('frigofrota_shopping_list', JSON.stringify(listToSave));
 
       if (activeBackup.avarias) {
+        setAvarias(activeBackup.avarias);
         localStorage.setItem('frigofrota_avarias', JSON.stringify(activeBackup.avarias));
       }
 
       const opcoes = activeBackup.opcoesManutencao || [];
       if (opcoes.length > 0) {
+        setOpcoesManutencao(opcoes);
         localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(opcoes));
       }
 
@@ -670,6 +748,27 @@ export default function App() {
 
   useEffect(() => {
     if (isInitializing) return;
+
+    const currentDataStr = JSON.stringify({
+      veiculos,
+      manutencoes,
+      opcoesManutencao,
+      avarias,
+      shoppingList,
+      custoPadraoDiario
+    });
+
+    // Se o ref estiver vazio (primeiro carregamento após isInitializing mudar), inicializa o ref
+    if (!lastSyncedDataRef.current) {
+      lastSyncedDataRef.current = currentDataStr;
+      return;
+    }
+
+    // Se não mudou os dados, não faz o backup automático
+    if (currentDataStr === lastSyncedDataRef.current) {
+      return;
+    }
+
     if (autoSync && codigoFrota) {
       // Evita salvar automaticamente se a frota estiver totalmente vazia no início
       if (veiculos.length === 0 && manutencoes.length === 0) {
@@ -677,11 +776,23 @@ export default function App() {
         return;
       }
       const timer = setTimeout(() => {
-        sincronizarComNuvem();
+        // Atualiza o ref antes de chamar sincronizarComNuvem para evitar chamadas duplicadas
+        lastSyncedDataRef.current = currentDataStr;
+        sincronizarComNuvem(undefined, true);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [veiculos, manutencoes, custoPadraoDiario, autoSync, codigoFrota, isInitializing]);
+  }, [
+    veiculos,
+    manutencoes,
+    opcoesManutencao,
+    avarias,
+    shoppingList,
+    custoPadraoDiario,
+    autoSync,
+    codigoFrota,
+    isInitializing
+  ]);
 
   useEffect(() => {
     if (isInitializing) return;
@@ -1109,6 +1220,8 @@ export default function App() {
         {tabAtiva === 'compras' && (
           <ShoppingListView
             onBack={() => setTabAtiva('dashboard')}
+            shoppingItems={shoppingList}
+            setShoppingItems={setShoppingList}
           />
         )}
 
@@ -1122,6 +1235,10 @@ export default function App() {
             onDeleteVehicle={handleDeleteVehicle}
             onSimulateTemperatures={handleSimulateTemperatures}
             onAddMaintenance={handleAddMaintenance}
+            avariasMap={avarias}
+            setAvariasMap={setAvarias}
+            opcoesPredefinidas={opcoesManutencao}
+            setOpcoesPredefinidas={setOpcoesManutencao}
           />
         )}
 

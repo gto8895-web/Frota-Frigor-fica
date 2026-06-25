@@ -203,6 +203,10 @@ interface VehiclesViewProps {
   onDeleteVehicle: (id: string) => void;
   onSimulateTemperatures: () => void;
   onAddMaintenance?: (m: Omit<Manutencao, 'id'>) => void;
+  avariasMap: Record<string, Avaria[]>;
+  setAvariasMap: React.Dispatch<React.SetStateAction<Record<string, Avaria[]>>>;
+  opcoesPredefinidas: string[];
+  setOpcoesPredefinidas: React.Dispatch<React.SetStateAction<string[]>>;
 }
 
 export default function VehiclesView({
@@ -213,7 +217,11 @@ export default function VehiclesView({
   onUpdateVehicle,
   onDeleteVehicle,
   onSimulateTemperatures,
-  onAddMaintenance
+  onAddMaintenance,
+  avariasMap,
+  setAvariasMap,
+  opcoesPredefinidas,
+  setOpcoesPredefinidas
 }: VehiclesViewProps) {
   const [filtroStatus, setFiltroStatus] = useState<string>('todos');
   const [selecaoVeiculoId, setSelecaoVeiculoId] = useState<string>('todos');
@@ -478,14 +486,6 @@ export default function VehiclesView({
 
   // Detalhes do Veículo (Histórico e Avarias)
   const [veiculoDetalhadoId, setVeiculoDetalhadoId] = useState<string | null>(null);
-  const [avariasMap, setAvariasMap] = useState<Record<string, Avaria[]>>(() => {
-    try {
-      const saved = localStorage.getItem('frigofrota_avarias');
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
-    }
-  });
   const [novaAvariaTexto, setNovaAvariaTexto] = useState<string>('');
 
   const handleAdicionarAvaria = (veiculoId: string) => {
@@ -539,28 +539,6 @@ export default function VehiclesView({
   // Lançar Manutenção Modal / Moldura
   const [modalManutencaoVeiculoId, setModalManutencaoVeiculoId] = useState<string | null>(null);
   const [textoManutencao, setTextoManutencao] = useState<string>('');
-  const [opcoesPredefinidas, setOpcoesPredefinidas] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('frigofrota_opcoes_manutencao');
-      return saved ? JSON.parse(saved) : [
-        'Troca de Correia',
-        'Troca de Ventilador',
-        'Carga de Gás',
-        'Troca do Compressor',
-        'Troca Chicote Elétrico',
-        'Troca de Válvula'
-      ];
-    } catch {
-      return [
-        'Troca de Correia',
-        'Troca de Ventilador',
-        'Carga de Gás',
-        'Troca do Compressor',
-        'Troca Chicote Elétrico',
-        'Troca de Válvula'
-      ];
-    }
-  });
   const [novaOpcaoTexto, setNovaOpcaoTexto] = useState<string>('');
 
   const handleAdicionarOpcao = () => {
