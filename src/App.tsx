@@ -551,6 +551,21 @@ export default function App() {
 
       setSyncStatus('success');
       localStorage.setItem('recuperar_codigo_frota', cleanCode);
+
+      // Salva também no _ACTIVE_CODE para resiliência absoluta a wipes de cache do Chrome
+      if (cleanCode !== '_REGISTRY' && cleanCode !== '_ACTIVE_CODE') {
+        try {
+          const activeDocRef = doc(db, 'frotas', '_ACTIVE_CODE');
+          await setDoc(activeDocRef, {
+            codigoActive: cleanCode,
+            updatedAt: now.toISOString()
+          });
+          console.log('[Sync] _ACTIVE_CODE atualizado na nuvem:', cleanCode);
+        } catch (activeErr) {
+          console.warn('[Sync] Falha ao atualizar _ACTIVE_CODE na nuvem:', activeErr);
+        }
+      }
+
       setTimeout(() => setSyncStatus('idle'), 3000);
     } catch (err: any) {
       console.error("Erro na sincronização direta com Firestore:", err);
@@ -635,6 +650,20 @@ export default function App() {
       setCodigoFrota(cleanCode);
       localStorage.setItem('recuperar_codigo_frota', cleanCode);
 
+      // Salva também no _ACTIVE_CODE para resiliência absoluta a wipes de cache do Chrome
+      if (cleanCode !== '_REGISTRY' && cleanCode !== '_ACTIVE_CODE') {
+        try {
+          const activeDocRef = doc(db, 'frotas', '_ACTIVE_CODE');
+          await setDoc(activeDocRef, {
+            codigoActive: cleanCode,
+            updatedAt: new Date().toISOString()
+          });
+          console.log('[Load] _ACTIVE_CODE atualizado na nuvem:', cleanCode);
+        } catch (activeErr) {
+          console.warn('[Load] Falha ao atualizar _ACTIVE_CODE na nuvem:', activeErr);
+        }
+      }
+
       setSyncStatus('success');
       alert('Dados da nuvem RECUPERADOS e restaurados com sucesso!');
       setTimeout(() => setSyncStatus('idle'), 3000);
@@ -700,8 +729,27 @@ export default function App() {
       try {
         let activeCode = localStorage.getItem('recuperar_codigo_frota') || '';
         
+        // Se não houver código ativo localmente, tenta ler direto da nuvem (Firestore) no documento global _ACTIVE_CODE
         if (!activeCode) {
-          console.log('[Init] Nenhum código no LocalStorage. Verificando código ativo no servidor Express...');
+          console.log('[Init] Nenhum código no LocalStorage. Buscando código ativo central em frotas/_ACTIVE_CODE no Firestore...');
+          try {
+            const activeDocRef = doc(db, 'frotas', '_ACTIVE_CODE');
+            const activeDocSnap = await getDoc(activeDocRef);
+            if (activeDocSnap.exists()) {
+              const activeDocData = activeDocSnap.data();
+              if (activeDocData && activeDocData.codigoActive) {
+                activeCode = activeDocData.codigoActive.trim();
+                console.log('[Init] Código ativo central localizado na nuvem:', activeCode);
+              }
+            }
+          } catch (fsErr) {
+            console.warn('[Init] Falha ao ler _ACTIVE_CODE diretamente do Firestore:', fsErr);
+          }
+        }
+
+        // Se ainda não houver, tenta o servidor Express
+        if (!activeCode) {
+          console.log('[Init] Nenhum código ativo na nuvem. Verificando código ativo no servidor Express...');
           const res = await fetch('/api/sync/active-code');
           if (res.ok) {
             const data = await res.json();
@@ -726,6 +774,19 @@ export default function App() {
         const cleanCode = activeCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
         setCodigoFrota(cleanCode);
         localStorage.setItem('recuperar_codigo_frota', cleanCode);
+
+        // Garante que o _ACTIVE_CODE central no Firestore e servidor estejam atualizados para o futuro
+        if (cleanCode !== '_REGISTRY' && cleanCode !== '_ACTIVE_CODE') {
+          try {
+            const activeDocRef = doc(db, 'frotas', '_ACTIVE_CODE');
+            await setDoc(activeDocRef, {
+              codigoActive: cleanCode,
+              updatedAt: new Date().toISOString()
+            });
+          } catch (activeErr) {
+            console.warn('[Init] Erro ao registrar _ACTIVE_CODE inicial na nuvem:', activeErr);
+          }
+        }
 
         // 2. Tentar carregar dados em tempo real (live) ou backups do Firestore
         console.log(`[Init] Buscando dados da nuvem para o código: ${cleanCode}...`);

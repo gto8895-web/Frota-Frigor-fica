@@ -72,6 +72,38 @@ async function saveToFirestoreREST(codigo: string, dados: any): Promise<boolean>
   }
 }
 
+// Helper to recursively parse Firestore REST API value types to standard JavaScript types
+function parseFirestoreValue(value: any): any {
+  if (!value) return null;
+  if ("stringValue" in value) return value.stringValue;
+  if ("integerValue" in value) return parseInt(value.integerValue, 10);
+  if ("doubleValue" in value) return parseFloat(value.doubleValue);
+  if ("booleanValue" in value) return value.booleanValue;
+  if ("nullValue" in value) return null;
+  if ("arrayValue" in value) {
+    const values = value.arrayValue.values || [];
+    return values.map((v: any) => parseFirestoreValue(v));
+  }
+  if ("mapValue" in value) {
+    const fields = value.mapValue.fields || {};
+    const result: any = {};
+    for (const key of Object.keys(fields)) {
+      result[key] = parseFirestoreValue(fields[key]);
+    }
+    return result;
+  }
+  return value;
+}
+
+function parseFirestoreFields(fields: any): any {
+  const result: any = {};
+  if (!fields) return result;
+  for (const key of Object.keys(fields)) {
+    result[key] = parseFirestoreValue(fields[key]);
+  }
+  return result;
+}
+
 // Helper to read from Firestore via REST API
 async function loadFromFirestoreREST(codigo: string): Promise<any | null> {
   try {
@@ -104,13 +136,21 @@ async function loadFromFirestoreREST(codigo: string): Promise<any | null> {
     }
 
     const docData = await res.json();
-    if (docData && docData.fields && docData.fields.dados && docData.fields.dados.stringValue) {
-      logDebug(`[Firestore REST API] Dados carregados com sucesso para a frota: ${codigo}`);
+    if (!docData || !docData.fields) {
+      logDebug(`[Firestore REST API] Documento para ${codigo} não possui campos válidos.`);
+      return null;
+    }
+
+    // Caso 1: Se estiver empacotado sob o campo 'dados' (StringValue JSON)
+    if (docData.fields.dados && docData.fields.dados.stringValue) {
+      logDebug(`[Firestore REST API] Dados carregados (formato empacotado dados JSON) para a frota: ${codigo}`);
       return JSON.parse(docData.fields.dados.stringValue);
     }
-    
-    logDebug(`[Firestore REST API] Documento para ${codigo} localizado, mas campos 'dados' ou 'stringValue' estão ausentes.`);
-    return null;
+
+    // Caso 2: Se for um documento com campos desempacotados (salvo pelo Client SDK)
+    logDebug(`[Firestore REST API] Dados carregados (formato desempacotado) para a frota: ${codigo}`);
+    const parsedObj = parseFirestoreFields(docData.fields);
+    return parsedObj;
   } catch (error: any) {
     logDebug(`[Firestore REST API] Erro na requisição de carregamento para ${codigo}: ${error.stack || error}`);
     return null;
@@ -256,8 +296,22 @@ async function startServer() {
         }
       }
 
-      // Fallback robusto: carregar o registro central e obter a última frota atualizada
-      console.log("[Active Code API] Arquivo active_code.txt não existe ou está vazio. Buscando última frota no _REGISTRY...");
+      // Fallback 1: Buscar do documento central _ACTIVE_CODE no Firestore
+      console.log("[Active Code API] Arquivo active_code.txt não existe. Buscando _ACTIVE_CODE na nuvem...");
+      const activeDoc = await loadFromFirestoreREST("_ACTIVE_CODE");
+      if (activeDoc && activeDoc.codigoActive) {
+        const activeCode = activeDoc.codigoActive.trim();
+        console.log("[Active Code API] Retornando código ativo recuperado de _ACTIVE_CODE:", activeCode);
+        try {
+          fs.writeFileSync(filePath, activeCode, "utf8");
+        } catch (err) {
+          console.warn("[Active Code API] Falha ao salvar active_code.txt:", err);
+        }
+        return res.json({ success: true, codigoFrota: activeCode });
+      }
+
+      // Fallback 2: carregar o registro central _REGISTRY e obter a última frota atualizada
+      console.log("[Active Code API] _ACTIVE_CODE não localizado. Buscando última frota no _REGISTRY...");
       const registry = await loadFromFirestoreREST("_REGISTRY");
       if (registry && Array.isArray(registry.frotas) && registry.frotas.length > 0) {
         // Ordena por updatedAt decrescente
