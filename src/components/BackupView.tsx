@@ -92,44 +92,138 @@ export default function BackupView({
     fetchBackupsNuvem();
   }, [codigoFrota]);
 
-  const handleImportCloudBackup = () => {
-    if (selectedBackupIndex === null || !backupsNuvem[selectedBackupIndex]) {
-      alert('Por favor, selecione um Backup.');
-      return;
+  const handleImportCloudBackup = async () => {
+    let codeToUse = codigoFrota;
+    if (!codeToUse) {
+      const inputCode = prompt("Código de backup da nuvem não configurado (pois os dados locais foram excluídos). Por favor, digite o seu código de backup da nuvem:");
+      if (!inputCode || !inputCode.trim()) {
+        return;
+      }
+      codeToUse = inputCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
     }
-    const b = backupsNuvem[selectedBackupIndex];
-    if (window.confirm(`Deseja realmente restaurar o Backup do dia ${b.label}? Isso substituirá todos os seus dados atuais.`)) {
-      onRestoreBackup({
-        veiculos: b.veiculos || [],
-        manutencoes: b.manutencoes || [],
-        custoPadraoDiario: b.custoPadraoDiario || 150,
-        shopping_list: b.shopping_list || [],
-        avarias: b.avarias || {},
-        opcoesManutencao: b.opcoesManutencao || []
-      });
 
-      if (b.shopping_list) {
-        localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
+    setLoadingBackups(true);
+    setStatusMessage({
+      text: 'Conectando com a nuvem para recuperar seu backup...',
+      type: 'success'
+    });
+
+    try {
+      // 1. Tentar ler do Firestore usando o SDK do cliente primeiro
+      let parsed: any = null;
+      try {
+        const docRef = doc(db, 'frotas', codeToUse);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          if (docData && docData.dados) {
+            parsed = JSON.parse(docData.dados);
+          }
+        }
+      } catch (err) {
+        console.warn('Falha ao ler diretamente do Firestore SDK, tentando API do servidor...', err);
       }
-      if (b.avarias) {
-        localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
+
+      // 2. Se falhou pelo SDK, usar API do servidor como fallback
+      if (!parsed) {
+        const res = await fetch(`/api/sync/load/${codeToUse}`);
+        if (res.ok) {
+          const loadData = await res.json();
+          if (loadData.success && loadData.dados) {
+            parsed = loadData.dados;
+          }
+        }
       }
-      
-      const listToSave = b.opcoesManutencao || [];
-      if (listToSave.length > 0) {
-        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
+
+      if (!parsed) {
+        alert('Código de backup não localizado na nuvem ou nenhum dado foi encontrado.');
+        setStatusMessage({
+          text: 'Não foi possível encontrar nenhum backup na nuvem para este código.',
+          type: 'error'
+        });
+        return;
+      }
+
+      let b: any = null;
+      if (parsed && Array.isArray(parsed.backups) && parsed.backups.length > 0) {
+        // Se houver uma seleção no select dropdown e ela corresponder a um index válido, usamos.
+        // Caso contrário, usamos o mais recente [0] (que é o último lançado)
+        if (selectedBackupIndex !== null && parsed.backups[selectedBackupIndex]) {
+          b = parsed.backups[selectedBackupIndex];
+        } else {
+          b = parsed.backups[0]; // Último backup lançado
+        }
+      } else if (parsed && parsed.veiculos) {
+        b = {
+          id: 'old-1',
+          data_criacao: parsed.updatedAt || new Date().toISOString(),
+          label: 'Backup Anterior',
+          veiculos: parsed.veiculos,
+          manutencoes: parsed.manutencoes,
+          custoPadraoDiario: parsed.custoPadraoDiario || 150,
+          shopping_list: parsed.shopping_list || [],
+          avarias: parsed.avarias || {},
+          opcoesManutencao: parsed.opcoesManutencao || []
+        };
+      }
+
+      if (!b) {
+        alert('Nenhum backup encontrado no banco de dados para este código.');
+        setStatusMessage({
+          text: 'Nenhum backup encontrado.',
+          type: 'error'
+        });
+        return;
+      }
+
+      if (window.confirm(`Deseja realmente restaurar o Backup do dia ${b.label}? Isso substituirá todos os seus dados atuais.`)) {
+        // Grava o código recuperado no estado e no localStorage
+        setCodigoFrota(codeToUse);
+        localStorage.setItem('recuperar_codigo_frota', codeToUse);
+
+        onRestoreBackup({
+          veiculos: b.veiculos || [],
+          manutencoes: b.manutencoes || [],
+          custoPadraoDiario: b.custoPadraoDiario || 150,
+          shopping_list: b.shopping_list || [],
+          avarias: b.avarias || {},
+          opcoesManutencao: b.opcoesManutencao || []
+        });
+
+        if (b.shopping_list) {
+          localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
+        }
+        if (b.avarias) {
+          localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
+        }
+        
+        const listToSave = b.opcoesManutencao || [];
+        if (listToSave.length > 0) {
+          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
+        } else {
+          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify([]));
+        }
+
+        setStatusMessage({
+          text: `Backup (${b.label}) importado com sucesso! Recarregando...`,
+          type: 'success'
+        });
+
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
       } else {
-        localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify([]));
+        setStatusMessage(null);
       }
-
+    } catch (err: any) {
+      console.error("Erro ao importar do Firestore:", err);
+      alert("Erro ao comunicar com a nuvem: " + (err.message || err));
       setStatusMessage({
-        text: `Backup (${b.label}) importado com sucesso! Recarregando...`,
-        type: 'success'
+        text: 'Erro de comunicação com a nuvem.',
+        type: 'error'
       });
-
-      setTimeout(() => {
-        window.location.reload();
-      }, 1500);
+    } finally {
+      setLoadingBackups(false);
     }
   };
 
@@ -405,7 +499,7 @@ export default function BackupView({
               <button
                 type="button"
                 onClick={handleImportCloudBackup}
-                disabled={syncStatus === 'syncing' || selectedBackupIndex === null}
+                disabled={syncStatus === 'syncing' || loadingBackups}
                 className="flex-1 flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 disabled:opacity-50 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-sky-450" />
