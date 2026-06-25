@@ -8,6 +8,9 @@ interface BackupViewProps {
   veiculos: Veiculo[];
   manutencoes: Manutencao[];
   custoPadraoDiario: number;
+  shoppingList: any[];
+  avarias: any;
+  opcoesManutencao: string[];
   onRestoreBackup: (data: {
     veiculos: Veiculo[];
     manutencoes: Manutencao[];
@@ -34,6 +37,9 @@ export default function BackupView({
   veiculos,
   manutencoes,
   custoPadraoDiario,
+  shoppingList,
+  avarias,
+  opcoesManutencao,
   onRestoreBackup,
   onClearHistoryAndAvarias,
   onBack,
@@ -126,7 +132,7 @@ export default function BackupView({
               type: 'success'
             });
 
-            // Grava o código recuperado no estado e no localStorage
+            // Grava o código recuperado no estado e no localStorage do código
             setCodigoFrota(codeToUse);
             localStorage.setItem('recuperar_codigo_frota', codeToUse);
 
@@ -139,20 +145,7 @@ export default function BackupView({
               opcoesManutencao: b.opcoesManutencao || []
             });
 
-            if (b.shopping_list) {
-              localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
-            }
-            if (b.avarias) {
-              localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
-            }
-            if (b.opcoesManutencao) {
-              localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(b.opcoesManutencao));
-            }
-
-            alert(`Como seus dados locais do Chrome foram limpos, o seu último backup da nuvem ("${b.label}") foi recuperado e restaurado automaticamente!`);
-            setTimeout(() => {
-              window.location.reload();
-            }, 1000);
+            alert(`Dados da nuvem ("${b.label}") recuperados e restaurados com sucesso!`);
             return;
           }
         }
@@ -311,7 +304,7 @@ export default function BackupView({
       }
 
       if (window.confirm(`Deseja realmente restaurar o Backup do dia ${b.label}? Isso substituirá todos os seus dados atuais.`)) {
-        // Grava o código recuperado no estado e no localStorage
+        // Grava o código recuperado no estado e no localStorage do código
         setCodigoFrota(codeToUse);
         localStorage.setItem('recuperar_codigo_frota', codeToUse);
 
@@ -324,28 +317,10 @@ export default function BackupView({
           opcoesManutencao: b.opcoesManutencao || []
         });
 
-        if (b.shopping_list) {
-          localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
-        }
-        if (b.avarias) {
-          localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
-        }
-        
-        const listToSave = b.opcoesManutencao || [];
-        if (listToSave.length > 0) {
-          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(listToSave));
-        } else {
-          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify([]));
-        }
-
         setStatusMessage({
-          text: `Backup (${b.label}) importado com sucesso! Recarregando...`,
+          text: `Backup (${b.label}) importado com sucesso!`,
           type: 'success'
         });
-
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
       } else {
         setStatusMessage(null);
       }
@@ -361,31 +336,23 @@ export default function BackupView({
     }
   };
 
-  // Obter itens da lista de compras do localStorage para incluir no backup
+  // Obter itens da lista de compras para incluir no backup
   const obterItensShoppingList = () => {
-    try {
-      const saved = localStorage.getItem('frigofrota_shopping_list');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      return [];
-    }
+    return shoppingList;
   };
 
-  // Helper para ler itens adicionais do localStorage de forma segura
+  // Helper para ler itens adicionais de forma segura
   const obterLocalStorageData = (key: string, fallback: any) => {
-    try {
-      const saved = localStorage.getItem(key);
-      return saved ? JSON.parse(saved) : fallback;
-    } catch (e) {
-      return fallback;
-    }
+    if (key === 'frigofrota_avarias') return avarias;
+    if (key === 'frigofrota_opcoes_manutencao') return opcoesManutencao;
+    return fallback;
   };
 
   const handleExportBackup = () => {
     try {
-      const shoppingList = obterItensShoppingList();
-      const avarias = obterLocalStorageData('frigofrota_avarias', {});
-      const opcoesManutencao = obterLocalStorageData('frigofrota_opcoes_manutencao', []);
+      const shopList = obterItensShoppingList();
+      const avs = obterLocalStorageData('frigofrota_avarias', {});
+      const opts = obterLocalStorageData('frigofrota_opcoes_manutencao', []);
 
       const backupData = {
         frigofrota_backup: true,
@@ -469,30 +436,10 @@ export default function BackupView({
           opcoesManutencao: parsed.opcoesManutencao || []
         });
 
-        // Caso haja itens da lista de compras, salvar no localStorage
-        if (Array.isArray(parsed.shopping_list)) {
-          localStorage.setItem('frigofrota_shopping_list', JSON.stringify(parsed.shopping_list));
-        }
-
-        // Caso haja checklists de avarias, salvar no localStorage
-        if (parsed.avarias) {
-          localStorage.setItem('frigofrota_avarias', JSON.stringify(parsed.avarias));
-        }
-
-        // Caso haja opções customizadas de manutenção, salvar no localStorage
-        if (parsed.opcoesManutencao) {
-          localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(parsed.opcoesManutencao));
-        }
-
         setStatusMessage({
-          text: `Backup restaurado com sucesso! Importados ${parsed.veiculos.length} caminhões e ${parsed.manutencoes.length} manutenções. Atualizando o painel...`,
+          text: `Backup restaurado com sucesso! Importados ${parsed.veiculos.length} caminhões e ${parsed.manutencoes.length} manutenções.`,
           type: 'success'
         });
-
-        // Força uma atualização limpa para recarregar todos os componentes com dados novos do localStorage
-        setTimeout(() => {
-          window.location.reload();
-        }, 1500);
 
       } catch (error: any) {
         setStatusMessage({

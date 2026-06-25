@@ -506,7 +506,6 @@ export default function VehiclesView({
     };
 
     setAvariasMap(novasAvarias);
-    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
     setNovaAvariaTexto('');
   };
 
@@ -521,7 +520,6 @@ export default function VehiclesView({
     };
 
     setAvariasMap(novasAvarias);
-    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
   };
 
   const handleExcluirAvaria = (veiculoId: string, avariaId: string) => {
@@ -533,7 +531,6 @@ export default function VehiclesView({
     };
 
     setAvariasMap(novasAvarias);
-    localStorage.setItem('frigofrota_avarias', JSON.stringify(novasAvarias));
   };
 
   // Lançar Manutenção Modal / Moldura
@@ -549,7 +546,6 @@ export default function VehiclesView({
     }
     const novasOpcoes = [...opcoesPredefinidas, textoLimpo];
     setOpcoesPredefinidas(novasOpcoes);
-    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(novasOpcoes));
     setNovaOpcaoTexto('');
   };
 
@@ -557,7 +553,6 @@ export default function VehiclesView({
     e.stopPropagation(); // Evita ativar/remover item do texto
     const novasOpcoes = opcoesPredefinidas.filter(o => o !== op);
     setOpcoesPredefinidas(novasOpcoes);
-    localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(novasOpcoes));
   };
 
   const handleSubmeter = (e: React.FormEvent) => {
