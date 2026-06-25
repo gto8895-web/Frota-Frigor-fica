@@ -52,45 +52,178 @@ export default function BackupView({
   const [backupsNuvem, setBackupsNuvem] = useState<any[]>([]);
   const [selectedBackupIndex, setSelectedBackupIndex] = useState<number | null>(null);
   const [loadingBackups, setLoadingBackups] = useState(false);
+  const [tempCode, setTempCode] = useState(codigoFrota);
 
-  const fetchBackupsNuvem = async () => {
-    if (!codigoFrota) return;
+  React.useEffect(() => {
+    setTempCode(codigoFrota);
+  }, [codigoFrota]);
+
+  const fetchBackupsNuvemForCode = async (codeToUse: string) => {
+    if (!codeToUse || !codeToUse.trim()) return;
     setLoadingBackups(true);
     try {
-      const docRef = doc(db, 'frotas', codigoFrota);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        const docData = docSnap.data();
-        if (docData && docData.dados) {
-          const parsed = JSON.parse(docData.dados);
-          if (parsed && Array.isArray(parsed.backups)) {
-            setBackupsNuvem(parsed.backups);
-          } else if (parsed && parsed.veiculos) {
-            // Retrocompatibilidade se era um backup único antes
-            setBackupsNuvem([{
-              id: 'old-1',
-              data_criacao: parsed.updatedAt || new Date().toISOString(),
-              label: 'Backup Anterior',
-              veiculos: parsed.veiculos,
-              manutencoes: parsed.manutencoes,
-              custoPadraoDiario: parsed.custoPadraoDiario || 150,
-              shopping_list: parsed.shopping_list || [],
-              avarias: parsed.avarias || {},
-              opcoesManutencao: parsed.opcoesManutencao || []
-            }]);
+      // 1. Tentar ler do Firestore usando o SDK do cliente primeiro
+      let parsed: any = null;
+      try {
+        const docRef = doc(db, 'frotas', codeToUse);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const docData = docSnap.data();
+          if (docData && docData.dados) {
+            parsed = JSON.parse(docData.dados);
           }
         }
+      } catch (err) {
+        console.warn('Falha ao ler diretamente do Firestore SDK, tentando API do servidor...', err);
       }
-    } catch (err) {
+
+      // 2. Se falhou pelo SDK, tentar usar API do servidor como fallback
+      if (!parsed) {
+        try {
+          const res = await fetch(`/api/sync/load/${codeToUse}`);
+          if (res.ok) {
+            const loadData = await res.json();
+            if (loadData.success && loadData.dados) {
+              parsed = loadData.dados;
+            }
+          }
+        } catch (apiErr) {
+          console.error("Falha ao carregar via API:", apiErr);
+        }
+      }
+
+      if (parsed) {
+        let backups: any[] = [];
+        if (Array.isArray(parsed.backups)) {
+          backups = parsed.backups;
+        } else if (parsed.veiculos) {
+          // Retrocompatibilidade se era um backup único antes
+          backups = [{
+            id: 'old-1',
+            data_criacao: parsed.updatedAt || new Date().toISOString(),
+            label: 'Backup Anterior',
+            veiculos: parsed.veiculos,
+            manutencoes: parsed.manutencoes,
+            custoPadraoDiario: parsed.custoPadraoDiario || 150,
+            shopping_list: parsed.shopping_list || [],
+            avarias: parsed.avarias || {},
+            opcoesManutencao: parsed.opcoesManutencao || []
+          }];
+        }
+
+        setBackupsNuvem(backups);
+
+        // REGRA DE PROTEÇÃO CONTRA PERDA DE DADOS:
+        // Se a lista de manutenção está zerada (length === 0) e existem backups na nuvem,
+        // o app restaura automaticamente o último backup que possui manutenções válidas!
+        if (manutencoes.length === 0 && backups.length > 0) {
+          const backupValido = backups.find((item: any) => item.manutencoes && item.manutencoes.length > 0);
+          const b = backupValido || backups[0];
+
+          if (b) {
+            setStatusMessage({
+              text: `Detectado que o aplicativo foi redefinido ou limpo. Restaurando o último backup (${b.label}) automaticamente...`,
+              type: 'success'
+            });
+
+            // Grava o código recuperado no estado e no localStorage
+            setCodigoFrota(codeToUse);
+            localStorage.setItem('recuperar_codigo_frota', codeToUse);
+
+            onRestoreBackup({
+              veiculos: b.veiculos || [],
+              manutencoes: b.manutencoes || [],
+              custoPadraoDiario: b.custoPadraoDiario || 150,
+              shopping_list: b.shopping_list || [],
+              avarias: b.avarias || {},
+              opcoesManutencao: b.opcoesManutencao || []
+            });
+
+            if (b.shopping_list) {
+              localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
+            }
+            if (b.avarias) {
+              localStorage.setItem('frigofrota_avarias', JSON.stringify(b.avarias));
+            }
+            if (b.opcoesManutencao) {
+              localStorage.setItem('frigofrota_opcoes_manutencao', JSON.stringify(b.opcoesManutencao));
+            }
+
+            alert(`Como seus dados locais do Chrome foram limpos, o seu último backup da nuvem ("${b.label}") foi recuperado e restaurado automaticamente!`);
+            setTimeout(() => {
+              window.location.reload();
+            }, 1000);
+            return;
+          }
+        }
+
+        if (backups.length > 0) {
+          setStatusMessage({
+            text: `Conectado com sucesso! Encontrados ${backups.length} backups na nuvem para o código "${codeToUse}".`,
+            type: 'success'
+          });
+        } else {
+          setStatusMessage({
+            text: `Código "${codeToUse}" conectado, mas nenhum backup foi encontrado nesta conta.`,
+            type: 'error'
+          });
+        }
+      } else {
+        setBackupsNuvem([]);
+        setStatusMessage({
+          text: `Nenhum backup encontrado na nuvem para o código "${codeToUse}". Verifique a grafia ou salve novos dados para criar este código.`,
+          type: 'error'
+        });
+      }
+    } catch (err: any) {
       console.error("Erro ao carregar backups da nuvem:", err);
+      setStatusMessage({
+        text: 'Erro de conexão com a nuvem: ' + (err.message || err),
+        type: 'error'
+      });
     } finally {
       setLoadingBackups(false);
     }
   };
 
+  const fetchBackupsNuvem = () => fetchBackupsNuvemForCode(codigoFrota);
+
   React.useEffect(() => {
-    fetchBackupsNuvem();
+    fetchBackupsNuvemForCode(codigoFrota);
   }, [codigoFrota]);
+
+  const handleVincularCodigo = async () => {
+    if (!tempCode || !tempCode.trim()) {
+      alert("Por favor, digite um código de oficina válido.");
+      return;
+    }
+    const clean = tempCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+    if (!clean) {
+      alert("Código inválido.");
+      return;
+    }
+
+    setCodigoFrota(clean);
+    localStorage.setItem('recuperar_codigo_frota', clean);
+
+    setStatusMessage({
+      text: `Alterando para o código "${clean}" e baixando backups na nuvem...`,
+      type: 'success'
+    });
+
+    // Salva o novo código ativo no servidor de forma assíncrona para persistir em active_code.txt
+    try {
+      await fetch('/api/sync/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ codigoFrota: clean, dados: { backups: backupsNuvem } })
+      });
+    } catch (e) {
+      console.warn("Erro ao notificar servidor sobre novo código ativo:", e);
+    }
+
+    await fetchBackupsNuvemForCode(clean);
+  };
 
   const handleImportCloudBackup = async () => {
     let codeToUse = codigoFrota;
@@ -434,6 +567,49 @@ export default function BackupView({
               </div>
             </div>
           )}
+
+          {/* SEÇÃO DE CÓDIGO DA OFICINA / VINCULAR CONTA ANTERIOR */}
+          <div className="bg-[#020617]/40 border border-slate-800 rounded-xl p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 bg-amber-500/10 text-amber-500 rounded-lg border border-amber-500/20">
+                <Database className="w-4 h-4 shrink-0" />
+              </div>
+              <div>
+                <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Vincular Código da Oficina (Recuperar Conta)</h3>
+                <p className="text-[11px] text-slate-400">Insira seu código de backup da nuvem anterior caso você tenha limpo os dados do Chrome.</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  value={tempCode}
+                  onChange={(e) => setTempCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
+                  placeholder="EX: FRIGO-XXXXXX"
+                  className="w-full bg-[#1e293b] border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono font-bold uppercase focus:outline-none focus:border-sky-400 focus:ring-1 focus:ring-sky-400"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleVincularCodigo}
+                disabled={syncStatus === 'syncing' || loadingBackups}
+                className="bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs px-5 py-2.5 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5 shrink-0 disabled:opacity-55"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${loadingBackups ? 'animate-spin' : ''}`} />
+                Vincular &amp; Conectar
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[10px] text-slate-500 border-t border-slate-800/65 pt-2 font-medium">
+              <span>
+                Código ativo atual: <strong className="text-sky-400 font-mono text-[11px]">{codigoFrota || 'NENHUM'}</strong>
+              </span>
+              <span>
+                ⚠️ Mudar o código atualizará os backups exibidos abaixo.
+              </span>
+            </div>
+          </div>
 
           {/* SEÇÃO PRINCIPAL DE SINCRONIZAÇÃO EM NUVEM (EXPORTAR/IMPORTAR CLOUD SYNC) */}
           <div className="bg-[#020617] border border-sky-500/30 rounded-xl p-5 shadow-inner space-y-4">
