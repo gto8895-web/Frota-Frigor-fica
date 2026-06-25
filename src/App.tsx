@@ -490,13 +490,23 @@ export default function App() {
     localStorage.setItem('frigofrota_avarias', JSON.stringify({}));
   };
 
+  const isManutencoesZerada = () => {
+    if (manutencoes.length === 0) return true;
+    try {
+      const isMock = JSON.stringify(manutencoes) === JSON.stringify(INITIAL_MAINTENANCES);
+      return isMock;
+    } catch {
+      return false;
+    }
+  };
+
   // Sincronização em nuvem (RECUPERAR)
   const sincronizarComNuvem = async (codigoOverride?: string, isAuto = false) => {
     const cod = codigoOverride || codigoFrota;
     if (!cod.trim()) return;
 
-    if (manutencoes.length === 0) {
-      console.log('[Sync] Sincronização cancelada porque a lista de manutenção está zerada (evitando sobrescrever backup válido).');
+    if (isManutencoesZerada()) {
+      console.log('[Sync] Sincronização cancelada porque a lista de manutenção está zerada ou contém apenas dados modelo (evitando sobrescrever backup válido).');
       setSyncStatus('idle');
       return;
     }
@@ -524,7 +534,7 @@ export default function App() {
       }
     };
 
-    const cleanCode = cod.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    const cleanCode = cod.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
 
     const now = new Date();
     const dataFormatada = now.toLocaleString('pt-BR', {
@@ -676,7 +686,7 @@ export default function App() {
     setSyncStatus('syncing');
     setSyncError(null);
 
-    const cleanCode = codigoInput.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+    const cleanCode = codigoInput.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
 
     try {
       // 1. Carregar diretamente do Firestore via SDK do Cliente
@@ -776,9 +786,9 @@ export default function App() {
     }
 
     if (autoSync && codigoFrota) {
-      // Evita salvar automaticamente se a lista de manutenção estiver zerada
-      if (manutencoes.length === 0) {
-        console.log('[AutoSync] Ignorado porque a lista de manutenção está zerada. Protegendo backup na nuvem contra sobrescrita vazia.');
+      // Evita salvar automaticamente se a lista de manutenção estiver zerada ou com dados padrão (modelo)
+      if (isManutencoesZerada()) {
+        console.log('[AutoSync] Ignorado porque a lista de manutenção está zerada ou contém dados padrão (modelo). Protegendo backup na nuvem contra sobrescrita vazia.');
         return;
       }
       const timer = setTimeout(() => {
@@ -947,16 +957,16 @@ export default function App() {
     inicializarApp();
   }, []);
 
-  // Se a lista de manutenção estiver zerada localmente, baixar automaticamente os backups da nuvem e restaurar o mais recente
+  // Se a lista de manutenção estiver zerada localmente ou com dados modelo, baixar automaticamente os backups da nuvem e restaurar o mais recente válido
   useEffect(() => {
     if (isInitializing) return;
     
     const baixarERestaurarUltimoBackupSeZerado = async () => {
-      if (!codigoFrota || manutencoes.length > 0) return;
+      if (!codigoFrota || !isManutencoesZerada()) return;
 
-      console.log('[AutoImport] Lista de manutenção está zerada. Tentando baixar e restaurar o último backup da nuvem de:', codigoFrota);
+      console.log('[AutoImport] Lista de manutenção está zerada ou modelo. Tentando baixar e restaurar o último backup da nuvem de:', codigoFrota);
       try {
-        const cleanCode = codigoFrota.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+        const cleanCode = codigoFrota.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
         if (!cleanCode) return;
 
         // Tenta buscar no Firestore
@@ -985,7 +995,9 @@ export default function App() {
         if (parsed) {
           let b: any = null;
           if (Array.isArray(parsed.backups) && parsed.backups.length > 0) {
-            b = parsed.backups[0]; // O último backup lançado na nuvem (o mais recente)
+            // Tenta encontrar o mais recente que contenha manutenções para não reimportar um backup vazio acidental
+            const backupValido = parsed.backups.find((item: any) => item.manutencoes && item.manutencoes.length > 0);
+            b = backupValido || parsed.backups[0]; // Backup mais recente lançado se nenhum tiver manutenções
           } else if (parsed.veiculos) {
             b = parsed;
           }
@@ -1002,9 +1014,10 @@ export default function App() {
             setCustoPadraoDiario(b.custoPadraoDiario || 150);
             localStorage.setItem('ff_custo_diario', String(b.custoPadraoDiario || 150));
 
-            if (b.shopping_list) {
-              setShoppingList(b.shopping_list);
-              localStorage.setItem('frigofrota_shopping_list', JSON.stringify(b.shopping_list));
+            if (b.shopping_list || b.shoppingList) {
+              const sList = b.shopping_list || b.shoppingList || [];
+              setShoppingList(sList);
+              localStorage.setItem('frigofrota_shopping_list', JSON.stringify(sList));
             }
             if (b.avarias) {
               setAvarias(b.avarias);
@@ -1031,7 +1044,7 @@ export default function App() {
     };
 
     baixarERestaurarUltimoBackupSeZerado();
-  }, [codigoFrota, isInitializing, manutencoes.length]);
+  }, [codigoFrota, isInitializing, manutencoes]);
 
   if (isInitializing) {
     return (

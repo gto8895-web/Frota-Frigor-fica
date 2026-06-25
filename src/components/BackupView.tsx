@@ -99,7 +99,7 @@ export default function BackupView({
       if (!inputCode || !inputCode.trim()) {
         return;
       }
-      codeToUse = inputCode.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+      codeToUse = inputCode.trim().toUpperCase().replace(/[^A-Z0-9_-]/g, '');
     }
 
     setLoadingBackups(true);
@@ -147,11 +147,12 @@ export default function BackupView({
       let b: any = null;
       if (parsed && Array.isArray(parsed.backups) && parsed.backups.length > 0) {
         // Se houver uma seleção no select dropdown e ela corresponder a um index válido, usamos.
-        // Caso contrário, usamos o mais recente [0] (que é o último lançado)
+        // Caso contrário, tentamos usar o backup mais recente que contenha manutenções para evitar carregar backups vazios/modelo
         if (selectedBackupIndex !== null && parsed.backups[selectedBackupIndex]) {
           b = parsed.backups[selectedBackupIndex];
         } else {
-          b = parsed.backups[0]; // Último backup lançado
+          const backupValido = parsed.backups.find((item: any) => item.manutencoes && item.manutencoes.length > 0);
+          b = backupValido || parsed.backups[0]; // Último backup lançado como último fallback
         }
       } else if (parsed && parsed.veiculos) {
         b = {
