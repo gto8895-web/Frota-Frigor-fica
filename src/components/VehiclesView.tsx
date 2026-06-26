@@ -1115,7 +1115,7 @@ export default function VehiclesView({
             const isEditando = editandoId === v.id;
             const temManutencaoAtiva = manutencoes.some(m => m.veiculoId === v.id && m.status !== 'concluida');
             const temAvariaAtiva = (avariasMap[v.id] || []).some(av => !av.resolvido);
-            const deveDestacar = v.status === 'manutencao' || temManutencaoAtiva || temAvariaAtiva;
+            const deveDestacar = temManutencaoAtiva || temAvariaAtiva;
 
             return (
               <div 
