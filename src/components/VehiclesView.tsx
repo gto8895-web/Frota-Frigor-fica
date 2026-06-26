@@ -1113,13 +1113,16 @@ export default function VehiclesView({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {veiculosFiltrados.map(v => {
             const isEditando = editandoId === v.id;
+            const temManutencaoAtiva = manutencoes.some(m => m.veiculoId === v.id && m.status !== 'concluida');
+            const temAvariaAtiva = (avariasMap[v.id] || []).some(av => !av.resolvido);
+            const deveDestacar = v.status === 'manutencao' || temManutencaoAtiva || temAvariaAtiva;
 
             return (
               <div 
                 key={v.id}
                 className={`transition-all rounded-xl border ${
-                  v.status === 'manutencao'
-                    ? 'border-rose-800 bg-rose-950/10'
+                  deveDestacar
+                    ? 'border-rose-800 bg-rose-950/10 shadow-md shadow-rose-950/5'
                     : 'border-slate-800 bg-[#1e293b] hover:border-slate-700'
                 } p-5 shadow-sm flex flex-col justify-between`}
               >
@@ -1296,14 +1299,7 @@ export default function VehiclesView({
         </div>
       )}
 
-      {/* Nota Operacional */}
-      <div className="py-3 px-1 text-xs text-slate-300 flex items-start gap-2.5 select-none mt-4">
-        <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-        <div>
-          <span className="font-semibold text-amber-400 block pb-0.5">Dica de Sensor de Climatização:</span>
-          Filtre por <strong>"Câmaras em Alerta"</strong> para avaliar veículos que necessitam de intervenção rápida. Caminhões com desvio acima de 3°C da temperatura planejada alteram automaticamente os status térmicos, exigindo abertura de Ordem de Manutenção de Climatização para prevenir perdas de produtos congelados.
-        </div>
-      </div>
+
 
       {/* Moldura Simples de Lançamento de Manutenção (Modal) */}
       {modalManutencaoVeiculoId && (() => {

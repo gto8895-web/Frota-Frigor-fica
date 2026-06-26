@@ -914,9 +914,9 @@ export default function App() {
             <nav className="hidden md:flex gap-1.5">
               {[
                 { id: 'dashboard', name: 'Painel Geral', icon: LayoutDashboard },
-                { id: 'veiculos', name: 'Caminhões e Câmaras', icon: Truck },
+                { id: 'veiculos', name: 'Frota', icon: Truck },
                 { id: 'manutencoes', name: 'Histórico', icon: Wrench },
-                { id: 'orcamento', name: 'Orçamento Diário Padrão', icon: DollarSign }
+                { id: 'orcamento', name: 'Orçamento', icon: DollarSign }
               ].map(tab => {
                 const Icon = tab.icon;
                 return (
@@ -930,7 +930,7 @@ export default function App() {
                         : 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200'
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
+                    <Icon className="w-4 h-4 shrink-0" />
                     {tab.name}
                   </button>
                 );
@@ -939,12 +939,6 @@ export default function App() {
 
             {/* Estatísticas resumidas na Direção do Usuário */}
             <div className="flex items-center gap-2 shrink-0">
-              {codigoFrota && (
-                <span className="hidden sm:inline-flex bg-sky-950/45 text-sky-450 border border-sky-800/40 rounded-lg px-2.5 py-1 text-xs font-mono font-bold items-center gap-1.5 shadow-sm">
-                  <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-ping"></span>
-                  <span>NUVEM: {codigoFrota}</span>
-                </span>
-              )}
               <span className="bg-[#1e293b] text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1 sm:px-3.5 sm:py-1.5 text-xs sm:text-sm font-mono font-medium flex items-center gap-1.5 sm:gap-2 shadow-md">
                 <span>📅 {dataReferencia.split('-').reverse().join('/')}</span>
                 <span className="text-slate-500">|</span>

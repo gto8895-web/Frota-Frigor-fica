@@ -14,17 +14,17 @@ export function PlacaMercosul({ placa }: { placa: string }) {
   const placaFormatada = formatPlaca(placa);
 
   return (
-    <div className="inline-flex flex-col w-[110px] sm:w-[130px] border border-blue-600 rounded-[3px] overflow-hidden bg-white shadow-md select-none scale-90 origin-left">
+    <div className="inline-flex flex-col w-[145px] border-2 border-blue-600 rounded-[4px] overflow-hidden bg-white shadow-md select-none scale-90 origin-left">
       {/* Blue Top Band */}
-      <div className="bg-[#0051A3] text-white px-1 py-0.5 flex items-center justify-between text-[6px] font-bold tracking-wider leading-none select-none h-3">
-        <span className="text-[4px] text-blue-200">✨</span>
-        <span className="uppercase text-[7px] sm:text-[8px] font-sans font-extrabold tracking-widest text-center flex-1">BRASIL</span>
-        <span className="text-[7px] leading-none">🇧🇷</span>
+      <div className="bg-[#0051A3] text-white px-2 py-0.5 flex items-center justify-between text-[7px] font-bold tracking-wider leading-none select-none h-4">
+        <span className="text-[5px] text-blue-200">✨</span>
+        <span className="uppercase text-[8.5px] font-sans font-extrabold tracking-widest text-center flex-1">BRASIL</span>
+        <span className="text-[8.5px] leading-none">🇧🇷</span>
       </div>
       {/* Plate Body */}
-      <div className="bg-white px-1 py-0.5 flex items-center justify-center relative h-6 sm:h-7 border-t border-blue-600">
-        <span className="absolute left-1 bottom-0.5 text-[4px] text-[#0051A3] font-bold font-sans">BR</span>
-        <span className="text-[14px] sm:text-[17px] font-mono font-bold tracking-widest text-slate-950 leading-none">
+      <div className="bg-white px-1 py-0 flex items-center justify-center relative h-8 border-t-2 border-blue-600">
+        <span className="absolute left-1 bottom-0.5 text-[5px] text-[#0051A3] font-bold font-sans">BR</span>
+        <span className="text-[21px] font-plate font-bold tracking-wider text-slate-950 leading-none relative -translate-y-[3px]">
           {placaFormatada}
         </span>
       </div>

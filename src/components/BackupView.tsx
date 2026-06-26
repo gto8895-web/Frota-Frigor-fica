@@ -515,64 +515,9 @@ export default function BackupView({
             </div>
           )}
 
-          {/* SEÇÃO PRINCIPAL: BACKUPS MANUAIS (NUVEM E ARQUIVO LOCAL) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          {/* SEÇÃO PRINCIPAL: BACKUPS MANUAIS (ARQUIVO LOCAL) */}
+          <div className="max-w-xl mx-auto">
             
-            {/* CARD 1: BACKUP MANUAL NA NUVEM */}
-            <div className="bg-[#020617]/50 border border-slate-800 rounded-xl p-5 flex flex-col justify-between space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-sky-500/10 text-sky-400 rounded-lg border border-sky-500/20">
-                    <Cloud className="w-5 h-5" />
-                  </div>
-                  <div>
-                    <h3 className="font-display font-bold text-white text-xs uppercase tracking-wider">Cópia Manual na Nuvem</h3>
-                    <p className="text-[10px] text-slate-400">Salve ou recupere uma cópia segura nos servidores da nuvem de forma instantânea.</p>
-                  </div>
-                </div>
-
-                <div className="text-[11px] text-slate-300 space-y-1 bg-slate-900/40 p-3 rounded-lg border border-slate-800/60">
-                  <p>• Salva o estado atual na sua conta.</p>
-                  <p>• Ideal para sincronizar com outros celulares.</p>
-                  <div className="pt-1.5 border-t border-slate-800 flex items-center justify-between text-[10px] text-slate-400">
-                    <span>Código da Oficina:</span>
-                    <strong className="text-sky-400 font-mono">{codigoFrota || 'NÃO CONFIGURADO'}</strong>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 pt-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (window.confirm("Deseja exportar seus dados atuais manualmente para a nuvem? Isso salvará o estado atual.")) {
-                      await onSincronizarComNuvem();
-                      await fetchBackupsNuvem();
-                    }
-                  }}
-                  disabled={syncStatus === 'syncing'}
-                  className="w-full flex items-center justify-center gap-2 bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                >
-                  {syncStatus === 'syncing' ? (
-                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  ) : (
-                    <CloudLightning className="w-3.5 h-3.5" />
-                  )}
-                  Exportar para Nuvem
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleImportCloudBackup}
-                  disabled={syncStatus === 'syncing' || loadingBackups}
-                  className="w-full flex items-center justify-center gap-2 bg-[#1e293b] hover:bg-slate-800 text-slate-200 border border-slate-700 font-bold text-xs py-2.5 rounded-lg transition-all cursor-pointer disabled:opacity-50"
-                >
-                  <Download className="w-3.5 h-3.5 text-sky-450" />
-                  Importar da Nuvem
-                </button>
-              </div>
-            </div>
-
             {/* CARD 2: BACKUP MANUAL EM ARQUIVO JSON */}
             <div className="bg-[#020617]/50 border border-slate-800 rounded-xl p-5 flex flex-col justify-between space-y-4">
               <div className="space-y-2">
@@ -616,33 +561,6 @@ export default function BackupView({
               </div>
             </div>
 
-          </div>
-
-          {/* ÁREA SECUNDÁRIA: ALTERAR CÓDIGO DA OFICINA SE NECESSÁRIO */}
-          <div className="bg-[#020617]/20 border border-slate-800/80 rounded-xl p-4 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h4 className="text-xs font-semibold text-white">Alterar Código de Sincronização</h4>
-                <p className="text-[10px] text-slate-500">Mude seu código apenas se desejar conectar a outra oficina existente.</p>
-              </div>
-              <div className="flex gap-2 w-full sm:w-auto">
-                <input
-                  type="text"
-                  value={tempCode}
-                  onChange={(e) => setTempCode(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
-                  placeholder="CÓDIGO"
-                  className="bg-[#1e293b] border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-bold uppercase w-full sm:w-32 focus:outline-none focus:border-sky-400"
-                />
-                <button
-                  type="button"
-                  onClick={handleVincularCodigo}
-                  disabled={syncStatus === 'syncing' || loadingBackups}
-                  className="bg-sky-500/10 hover:bg-sky-500/25 text-sky-400 border border-sky-500/30 font-bold text-[10px] px-3 py-1.5 rounded-lg transition-all cursor-pointer disabled:opacity-50 shrink-0"
-                >
-                  Vincular
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Resumo da base atual */}
