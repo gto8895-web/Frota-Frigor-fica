@@ -59,14 +59,14 @@ export default function ShoppingListView({ onBack, shoppingItems, setShoppingIte
 
     const dataFormatada = formatarData(new Date());
 
-    // Estilização minimalista e profissional do PDF (Cabeçalho azul Frigofrota)
+    // Estilização minimalista e profissional do PDF (Cabeçalho azul Recuperar)
     doc.setFillColor(15, 23, 42); // Slate escuro
     doc.rect(0, 0, 210, 30, 'F'); // Cabeçalho colorido topo
 
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('LISTA DE COMPRAS - FRIGOFROTA', 15, 18);
+    doc.text('LISTA DE COMPRAS - RECUPERAR', 15, 18);
 
     doc.setTextColor(34, 197, 94); // Verde (emerald)
     doc.setFont('Helvetica', 'bold');
@@ -133,7 +133,7 @@ export default function ShoppingListView({ onBack, shoppingItems, setShoppingIte
       if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
         await navigator.share({
           files: [pdfFile],
-          title: `Lista de Compras Frigofrota`,
+          title: `Lista de Compras Recuperar`,
           text: `Segue em anexo o arquivo PDF da lista de compras para suprimentos de frota.`
         });
         return;
@@ -145,7 +145,7 @@ export default function ShoppingListView({ onBack, shoppingItems, setShoppingIte
     // Fallback: faz o download automático e abre o WhatsApp com o texto
     handleGerarPDF();
 
-    let relatorio = `🛒 *LISTA DE COMPRAS - FRIGOFROTA*\n`;
+    let relatorio = `🛒 *LISTA DE COMPRAS - RECUPERAR*\n`;
     relatorio += `📅 *Gerado em:* ${new Date().toLocaleDateString('pt-BR')}\n`;
     relatorio += `===================================\n\n`;
     relatorio += `*ITENS DA LISTA:*\n`;

@@ -343,19 +343,19 @@ export default function BackupView({
 
   // Helper para ler itens adicionais de forma segura
   const obterLocalStorageData = (key: string, fallback: any) => {
-    if (key === 'frigofrota_avarias') return avarias;
-    if (key === 'frigofrota_opcoes_manutencao') return opcoesManutencao;
+    if (key === 'recuperar_avarias' || key === 'frigofrota_avarias') return avarias;
+    if (key === 'recuperar_opcoes_manutencao' || key === 'frigofrota_opcoes_manutencao') return opcoesManutencao;
     return fallback;
   };
 
   const handleExportBackup = () => {
     try {
       const shopList = obterItensShoppingList();
-      const avs = obterLocalStorageData('frigofrota_avarias', {});
-      const opts = obterLocalStorageData('frigofrota_opcoes_manutencao', []);
+      const avs = obterLocalStorageData('recuperar_avarias', {});
+      const opts = obterLocalStorageData('recuperar_opcoes_manutencao', []);
 
       const backupData = {
-        frigofrota_backup: true,
+        recuperar_backup: true,
         data_criacao: new Date().toISOString(),
         veiculos,
         manutencoes,
@@ -419,7 +419,7 @@ export default function BackupView({
         if (
           !parsed || 
           typeof parsed !== 'object' || 
-          parsed.frigofrota_backup !== true || 
+          (parsed.recuperar_backup !== true && parsed.frigofrota_backup !== true) || 
           !Array.isArray(parsed.veiculos) || 
           !Array.isArray(parsed.manutencoes)
         ) {
@@ -443,7 +443,7 @@ export default function BackupView({
 
       } catch (error: any) {
         setStatusMessage({
-          text: error.message || 'Erro ao processar arquivo de backup. Certifique-se de que é um arquivo .json válido gerado pelo Frigofrota.',
+          text: error.message || 'Erro ao processar arquivo de backup. Certifique-se de que é um arquivo .json válido gerado pelo Recuperar.',
           type: 'error'
         });
       } finally {

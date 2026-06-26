@@ -1,4 +1,4 @@
-const CACHE_NAME = 'frigofrota-v3';
+const CACHE_NAME = 'recuperar-v3';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',

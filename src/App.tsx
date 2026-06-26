@@ -75,7 +75,7 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallBanner, setShowInstallBanner] = useState<boolean>(() => {
     try {
-      return localStorage.getItem('frigofrota_dismiss_install') !== 'true';
+      return localStorage.getItem('recuperar_dismiss_install') !== 'true';
     } catch {
       return true;
     }
@@ -91,7 +91,7 @@ export default function App() {
       // Armazena o evento para ser disparado posteriormente via botão
       setDeferredPrompt(e);
       // Garante banner aberto
-      const dismissed = localStorage.getItem('frigofrota_dismiss_install') === 'true';
+      const dismissed = localStorage.getItem('recuperar_dismiss_install') === 'true';
       if (!dismissed) {
         setShowInstallBanner(true);
       }
@@ -131,7 +131,7 @@ export default function App() {
   const handleDismissInstallBanner = () => {
     setShowInstallBanner(false);
     try {
-      localStorage.setItem('frigofrota_dismiss_install', 'true');
+      localStorage.setItem('recuperar_dismiss_install', 'true');
     } catch (e) {}
   };
 
@@ -877,7 +877,7 @@ export default function App() {
               <Truck className="w-10 h-10" />
             </div>
           </div>
-          <h2 className="text-lg font-bold font-display text-white">Frigofrota Cloud</h2>
+          <h2 className="text-lg font-bold font-display text-white">Recuperar Cloud</h2>
           <p className="text-xs text-slate-400 leading-relaxed">
             Sincronizando com a nuvem e restabelecendo seu painel administrativo seguro...
           </p>
