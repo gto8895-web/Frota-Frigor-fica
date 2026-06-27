@@ -56,7 +56,7 @@ export default function BudgetView({
   const totalVeiculosEmManutencao = veiculosComOrcamentosParaDia.filter(item => item.manutencoes.length > 0).length;
   const totalGeralDiario = veiculosComOrcamentosParaDia.reduce((sum, item) => sum + item.totalDoVeiculoNoDia, 0);
 
-  const gerarPDFDoc = () => {
+  const gerarPDFDoc = (ocultarValores: boolean = false) => {
     const doc = new jsPDF({
       orientation: 'portrait',
       unit: 'mm',
@@ -72,7 +72,7 @@ export default function BudgetView({
     doc.setTextColor(255, 255, 255);
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(16);
-    doc.text('ORÇAMENTO DOS SERVIÇOS', 15, 18);
+    doc.text(ocultarValores ? 'RELATÓRIO DOS SERVIÇOS' : 'ORÇAMENTO DOS SERVIÇOS', 15, 18);
 
     doc.setTextColor(34, 197, 94); // Verde (emerald)
     doc.setFont('Helvetica', 'bold');
@@ -106,8 +106,10 @@ export default function BudgetView({
         // PLACA, MARCA E MODELO
         doc.text(`PLACA: ${item.veiculo.placa} | MARCA: ${item.veiculo.marcaCaminhao.toUpperCase()} | MODELO: ${item.veiculo.modelo.toUpperCase()}`, 17, y);
         
-        // Custo fixo estabelecido no canto direito
-        doc.text(`R$ ${item.totalDoVeiculoNoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 165, y);
+        // Custo fixo estabelecido no canto direito (ocultado se for relatório)
+        if (!ocultarValores) {
+          doc.text(`R$ ${item.totalDoVeiculoNoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 165, y);
+        }
 
         y += 8;
 
@@ -147,36 +149,43 @@ export default function BudgetView({
       });
     }
 
-    // Seção final com a soma total das manutenções
-    if (y > 240) {
-      doc.addPage();
-      y = 25;
+    // Seção final com a soma total das manutenções (ocultado se for relatório)
+    if (!ocultarValores) {
+      if (y > 240) {
+        doc.addPage();
+        y = 25;
+      }
+
+      y += 5;
+      doc.setDrawColor(203, 213, 225); // Slate-200 border line divider
+      doc.setLineWidth(0.5);
+      doc.line(15, y, 195, y);
+      y += 10;
+
+      // Linha de total consolidado
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.text('SOMA TOTAL DAS MANUTENÇÕES:', 15, y);
+      doc.text(`R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 165, y);
     }
-
-    y += 5;
-    doc.setDrawColor(203, 213, 225); // Slate-200 border line divider
-    doc.setLineWidth(0.5);
-    doc.line(15, y, 195, y);
-    y += 10;
-
-    // Linha de total consolidado
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(12);
-    doc.text('SOMA TOTAL DAS MANUTENÇÕES:', 15, y);
-    doc.text(`R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 165, y);
 
     return doc;
   };
 
   const handleGerarPDF = () => {
-    const doc = gerarPDFDoc();
+    const doc = gerarPDFDoc(false);
     doc.save(`orcamento_servicos_${dataReferencia}.pdf`);
+  };
+
+  const handleGerarPDFRelatorio = () => {
+    const doc = gerarPDFDoc(true);
+    doc.save(`relatorio_servicos_${dataReferencia}.pdf`);
   };
 
   // Enviar relatório e carregar PDF automaticamente para enviar pelo WhatsApp
   const enviarPorWhatsApp = async () => {
     try {
-      const doc = gerarPDFDoc();
+      const doc = gerarPDFDoc(false);
       const pdfBlob = doc.output('blob');
       const fileName = `orcamento_servicos_${dataReferencia}.pdf`;
       const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
@@ -205,6 +214,40 @@ export default function BudgetView({
     relatorio += `• Caminhões em Manutenção: ${totalVeiculosEmManutencao} unidades\n`;
     relatorio += `💰 *VALOR TOTAL CONSOLIDADO: R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}*\n\n`;
     relatorio += `📎 _O arquivo PDF foi baixado automaticamente. Por favor, anexe o arquivo baixado *${`orcamento_servicos_${dataReferencia}.pdf`}* nesta conversa._`;
+
+    const encodedText = encodeURIComponent(relatorio);
+    const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  const enviarRelatorioPorWhatsApp = async () => {
+    try {
+      const doc = gerarPDFDoc(true);
+      const pdfBlob = doc.output('blob');
+      const fileName = `relatorio_servicos_${dataReferencia}.pdf`;
+      const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      // Se o navegador ou dispositivo possui suporte a compartilhamento de arquivos via Web Share API
+      if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+        await navigator.share({
+          files: [pdfFile],
+          title: `Relatório de Serviços ${dataReferencia.split('-').reverse().join('/')}`,
+          text: `Segue em anexo o arquivo PDF do relatório de manutenção de frota (sem valores) para o dia ${dataReferencia.split('-').reverse().join('/')}.`
+        });
+        return;
+      }
+    } catch (e) {
+      console.warn("Compartilhamento nativo não disponível, utilizando fallback padrão:", e);
+    }
+
+    handleGerarPDFRelatorio();
+
+    let relatorio = `🚚 *RELATÓRIO DIÁRIO DE TRABALHO E MANUTENÇÕES*\n`;
+    relatorio += `📅 *Referência:* ${dataReferencia.split('-').reverse().join('/')}\n`;
+    relatorio += `===================================\n\n`;
+    relatorio += `*RESUMO DO RELATÓRIO:*\n`;
+    relatorio += `• Caminhões em Manutenção: ${totalVeiculosEmManutencao} unidades\n\n`;
+    relatorio += `📎 _O arquivo PDF foi baixado automaticamente. Por favor, anexe o arquivo baixado *${`relatorio_servicos_${dataReferencia}.pdf`}* nesta conversa._`;
 
     const encodedText = encodeURIComponent(relatorio);
     const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedText}`;
@@ -276,6 +319,31 @@ export default function BudgetView({
             <Send className="w-4 h-4" />
             Enviar por WhatsApp
           </button>
+
+          <div className="border-t border-slate-700/60 my-2 pt-3">
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+              Relatório de Serviços (Sem Valores)
+            </label>
+            <div className="flex flex-col gap-2">
+              <button
+                id="btn-generate-report-pdf"
+                onClick={handleGerarPDFRelatorio}
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-slate-600 to-slate-700 hover:from-slate-500 hover:to-slate-600 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md cursor-pointer border border-transparent w-full"
+              >
+                <FileText className="w-4 h-4" />
+                Baixar Relatório (PDF)
+              </button>
+
+              <button
+                id="btn-send-wa-report"
+                onClick={enviarRelatorioPorWhatsApp}
+                className="flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md cursor-pointer border border-transparent w-full"
+              >
+                <Send className="w-4 h-4" />
+                Enviar Relatório por WhatsApp
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
