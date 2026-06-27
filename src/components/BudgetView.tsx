@@ -317,7 +317,7 @@ export default function BudgetView({
             className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20ba59] text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-md cursor-pointer border border-transparent w-full"
           >
             <Send className="w-4 h-4" />
-            Enviar por WhatsApp
+            Enviar Orçamento por WhatsApp
           </button>
 
           <div className="border-t border-slate-700/60 my-2 pt-3">
