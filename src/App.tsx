@@ -10,6 +10,7 @@ import BackupView from './components/BackupView';
 import { Truck, Wrench, DollarSign, LayoutDashboard, Settings, Radio, Download, Smartphone, Share, Info, X } from 'lucide-react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
+import { RECUPERAR_LOGO_BASE64 } from './components/logoBase64';
 
 export default function App() {
   // Estado de carregamento/inicialização inicial
@@ -900,12 +901,20 @@ export default function App() {
             
             {/* Logo Corporativa */}
             <div className="flex items-center gap-3 shrink-0">
-              <div className="p-2 bg-sky-500/10 border border-sky-500/20 text-sky-400 rounded-xl shadow-xs">
-                <Truck className="w-5 h-5" />
+              <div className="bg-slate-900 border border-slate-800/80 rounded-xl p-1 shadow-sm overflow-hidden h-11 w-20 flex items-center justify-center">
+                <img 
+                  src={RECUPERAR_LOGO_BASE64} 
+                  alt="RECUPERAR Logo" 
+                  className="h-full w-full object-contain rounded"
+                  referrerPolicy="no-referrer"
+                />
               </div>
-              <div>
-                <span className="font-display font-black text-sky-400 text-base tracking-tight block">
+              <div className="hidden sm:block">
+                <span className="font-display font-black text-sky-400 text-sm tracking-tight block">
                   RECUPERAR
+                </span>
+                <span className="text-[9px] text-slate-400 block font-mono -mt-1 uppercase tracking-wider">
+                  Gestão de Frota
                 </span>
               </div>
             </div>
