@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Veiculo, Manutencao, OrcamentoDiario } from '../types';
 import { Calendar, DollarSign, Printer, Copy, Check, FileText, Settings, ShieldAlert, Sparkles, HelpCircle, Send } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-// @ts-ignore
-import recuperarLogo from '../assets/images/recuperar_logo_1782840101075.jpg';
+import { RECUPERAR_LOGO_BASE64 } from './logoBase64';
 
 interface BudgetViewProps {
   veiculos: Veiculo[];
@@ -24,28 +23,6 @@ export default function BudgetView({
 }: BudgetViewProps) {
   const [copiado, setCopiado] = useState<boolean>(false);
   const [mostrarExplicacao, setMostrarExplicacao] = useState<boolean>(false);
-  const [logoBase64, setLogoBase64] = useState<string | null>(null);
-
-  useEffect(() => {
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0);
-        try {
-          const dataUrl = canvas.toDataURL('image/jpeg');
-          setLogoBase64(dataUrl);
-        } catch (err) {
-          console.error('Error converting image to base64:', err);
-        }
-      }
-    };
-    img.src = recuperarLogo;
-  }, []);
 
   // Filtrar manutenções do dia de referência
   const manutencoesDoDia = manutencoes.filter(m => m.data === dataReferencia);
@@ -111,15 +88,7 @@ export default function BudgetView({
     doc.setDrawColor(218, 225, 231);
     doc.setLineWidth(0.3);
     doc.rect(15, 15, 55, 35); // Border around the logo
-    if (logoBase64) {
-      doc.addImage(logoBase64, 'JPEG', 15.5, 15.5, 54, 34);
-    } else {
-      // Fallback
-      doc.setTextColor(0, 186, 198);
-      doc.setFont('Helvetica', 'bold');
-      doc.setFontSize(13);
-      doc.text('RECUPERAR', 22, 33);
-    }
+    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15.5, 15.5, 54, 34);
 
 
     // --- DADOS DA RECUPERAR (Topo Direito) ---
@@ -179,10 +148,9 @@ export default function BudgetView({
 
     // Coluna Esquerda
     doc.text('CNPJ: 08.879.982/0001-45', 15, 78);
-    doc.text('Seropédica - RJ', 15, 82);
 
     // Coluna Direita
-    doc.text('Logradouro: Rodovia Presidente Dutra, 42', 100, 78);
+    doc.text('Logradouro: Rodovia Presidente Dutra, 42 - Seropédica - RJ', 100, 78);
     doc.text('Bairro: Sao Miguel - CEP: 23.893-690', 100, 82);
     doc.text('Município/UF: Seropédica, RJ - Brasil', 100, 86);
 
