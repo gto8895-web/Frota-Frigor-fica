@@ -181,9 +181,9 @@ export default function BudgetView({
     doc.line(15, 68, 195, 68);
 
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(9);
+    doc.setFontSize(8);
     doc.setTextColor(15, 23, 42);
-    doc.text('PEO NOVA DISTRIBUIDORA', 15, 73);
+    doc.text('NOVA DISTRIBUIDORA E INDUSTRIA DE ALIMENTOS SEROPEDICA 42 LTDA.', 15, 73);
 
     // Detalhes do Cliente
     doc.setFont('Helvetica', 'normal');
@@ -191,14 +191,14 @@ export default function BudgetView({
     doc.setTextColor(71, 85, 105);
 
     // Coluna Esquerda
-    doc.text('CNPJ: 23.373.000/0011-04', 15, 78);
-    doc.text('Inscrição Estadual: 10226449', 15, 82);
-    doc.text('societario@grupovamos.com.br', 15, 86);
+    doc.text('CNPJ: 08.879.982/0001-45', 15, 78);
+    doc.text('Inscrição Estadual: Isento', 15, 82);
+    doc.text('Seropédica - RJ', 15, 86);
 
     // Coluna Direita
-    doc.text('AVENIDA BRASIL, 08191 - ENTRADA SUPLEMENTAR', 100, 78);
-    doc.text('RAMOS - Rio de Janeiro - RJ - CEP: 21030-000', 100, 82);
-    doc.text('Telefone: (11) 2377-7000', 100, 86);
+    doc.text('Logradouro: Rodovia Presidente Dutra, 42', 100, 78);
+    doc.text('Bairro: Sao Miguel - CEP: 23.893-690', 100, 82);
+    doc.text('Município/UF: Seropédica, RJ - Brasil', 100, 86);
 
 
     // --- SEÇÃO LISTA DOS SERVIÇOS ---
