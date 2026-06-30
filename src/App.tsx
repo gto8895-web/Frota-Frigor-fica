@@ -11,6 +11,30 @@ import { Truck, Wrench, DollarSign, LayoutDashboard, Settings, Radio, Download, 
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 
+const NOVAS_OPCOES_PADRAO = [
+  'Verificação dos ventiladores',
+  'Troca de ventilador do condensador',
+  'Troca do ventilador do evaporador',
+  'Verificação do nível de gás refrigerante',
+  'Troca da correia do compressor',
+  'Troca de compressor',
+  'Carga de gás refrigerante',
+  'Óleo do compressor',
+  'Reparo de chicote elétrico',
+  'Troca do sensor de temperatura',
+  'Troca do controlador'
+];
+
+function garantirNovasOpcoes(opcoesExistentes: string[]): string[] {
+  const lista = [...opcoesExistentes];
+  NOVAS_OPCOES_PADRAO.forEach(opcao => {
+    if (!lista.some(o => o.trim().toLowerCase() === opcao.trim().toLowerCase())) {
+      lista.push(opcao);
+    }
+  });
+  return lista;
+}
+
 export default function App() {
   // Estado de carregamento/inicialização inicial
   const [isInitializing, setIsInitializing] = useState(true);
@@ -50,14 +74,16 @@ export default function App() {
 
   // Novos estados centralizados de dados, inicialmente vazios (populados via Firestore na inicialização)
   const [avarias, setAvarias] = useState<any>({});
-  const [opcoesManutencao, setOpcoesManutencao] = useState<string[]>([
-    'Troca de Correia',
-    'Troca de Ventilador',
-    'Carga de Gás',
-    'Troca do Compressor',
-    'Troca Chicote Elétrico',
-    'Troca de Válvula'
-  ]);
+  const [opcoesManutencao, setOpcoesManutencao] = useState<string[]>(() => {
+    return garantirNovasOpcoes([
+      'Troca de Correia',
+      'Troca de Ventilador',
+      'Carga de Gás',
+      'Troca do Compressor',
+      'Troca Chicote Elétrico',
+      'Troca de Válvula'
+    ]);
+  });
   const [shoppingList, setShoppingList] = useState<any[]>([
     { id: '1', name: 'Gás Refrigerante R404A', completed: false },
     { id: '2', name: 'Filtro secador Thermo King', completed: false },
@@ -335,7 +361,7 @@ export default function App() {
       setAvarias(data.avarias);
     }
     if (data.opcoesManutencao) {
-      setOpcoesManutencao(data.opcoesManutencao);
+      setOpcoesManutencao(garantirNovasOpcoes(data.opcoesManutencao));
     }
   };
 
@@ -584,9 +610,7 @@ export default function App() {
       }
 
       const opcoes = activeState.opcoesManutencao || [];
-      if (opcoes.length > 0) {
-        setOpcoesManutencao(opcoes);
-      }
+      setOpcoesManutencao(garantirNovasOpcoes(opcoes));
 
       setCodigoFrota(cleanCode);
       localStorage.setItem('recuperar_codigo_frota', cleanCode);
@@ -790,7 +814,7 @@ export default function App() {
             setCustoPadraoDiario(activeState.custoPadraoDiario || 150);
             setShoppingList(activeState.shoppingList || activeState.shopping_list || []);
             setAvarias(activeState.avarias || {});
-            setOpcoesManutencao(activeState.opcoesManutencao || []);
+            setOpcoesManutencao(garantirNovasOpcoes(activeState.opcoesManutencao || []));
           } else {
             console.log('[Init] Dados inválidos ou vazios no documento. Carregando padrões...');
             await carregarEPersistirDadosPadrao(cleanCode);
@@ -823,14 +847,14 @@ export default function App() {
         { id: '3', name: 'Óleo lubrificante sintético ISO 68', completed: true }
       ];
       const mockAvarias = {};
-      const mockOpcoes = [
+      const mockOpcoes = garantirNovasOpcoes([
         'Troca de Correia',
         'Troca de Ventilador',
         'Carga de Gás',
         'Troca do Compressor',
         'Troca Chicote Elétrico',
         'Troca de Válvula'
-      ];
+      ]);
 
       setVeiculos(mockVeiculos);
       setManutencoes(mockManutencoes);
