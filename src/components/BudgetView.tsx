@@ -85,10 +85,7 @@ export default function BudgetView({
     };
 
     // --- LOGO RECUPERAR ---
-    doc.setDrawColor(218, 225, 231);
-    doc.setLineWidth(0.3);
-    doc.rect(15, 15, 55, 35); // Border around the logo
-    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15.5, 15.5, 54, 34);
+    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15, 14, 55, 36.6);
 
 
     // --- DADOS DA RECUPERAR (Topo Direito) ---
@@ -152,7 +149,7 @@ export default function BudgetView({
     // Coluna Direita
     doc.text('Logradouro: Rodovia Presidente Dutra, 42 - Seropédica - RJ', 100, 78);
     doc.text('Bairro: Sao Miguel - CEP: 23.893-690', 100, 82);
-    doc.text('Município/UF: Seropédica, RJ - Brasil', 100, 86);
+    doc.text('Brasil', 100, 86);
 
 
     // --- SEÇÃO LISTA DOS SERVIÇOS ---
