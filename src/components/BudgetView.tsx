@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Veiculo, Manutencao, OrcamentoDiario } from '../types';
 import { Calendar, DollarSign, Printer, Copy, Check, FileText, Settings, ShieldAlert, Sparkles, HelpCircle, Send } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+// @ts-ignore
+import recuperarLogo from '../assets/images/recuperar_logo_1782840101075.jpg';
 
 interface BudgetViewProps {
   veiculos: Veiculo[];
@@ -22,6 +24,28 @@ export default function BudgetView({
 }: BudgetViewProps) {
   const [copiado, setCopiado] = useState<boolean>(false);
   const [mostrarExplicacao, setMostrarExplicacao] = useState<boolean>(false);
+  const [logoBase64, setLogoBase64] = useState<string | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0);
+        try {
+          const dataUrl = canvas.toDataURL('image/jpeg');
+          setLogoBase64(dataUrl);
+        } catch (err) {
+          console.error('Error converting image to base64:', err);
+        }
+      }
+    };
+    img.src = recuperarLogo;
+  }, []);
 
   // Filtrar manutenções do dia de referência
   const manutencoesDoDia = manutencoes.filter(m => m.data === dataReferencia);
@@ -83,56 +107,19 @@ export default function BudgetView({
       }
     };
 
-    // --- LOGO RECUPERAR (Caminhão Baú, Ar Condicionado e Chave de Manutenção) ---
-    // Let's draw the Logo box: x=15, y=15, width=55, height=20 (Ends at x=70, y=35)
+    // --- LOGO RECUPERAR ---
     doc.setDrawColor(218, 225, 231);
     doc.setLineWidth(0.3);
-    doc.rect(15, 15, 55, 20); // Border of the logo box
-
-    // Truck cargo (baú) in Teal
-    doc.setFillColor(0, 186, 198);
-    doc.rect(18, 18, 9, 6.5, 'F');
-
-    // Truck cabin in Slate-800
-    doc.setFillColor(30, 41, 59);
-    doc.rect(27, 20.5, 3.5, 4, 'F');
-
-    // Truck cabin window
-    doc.setFillColor(255, 255, 255);
-    doc.rect(29, 21.2, 1.2, 1.5, 'F');
-
-    // Wheels
-    doc.setFillColor(15, 23, 42);
-    doc.circle(20.5, 25, 0.9, 'F');
-    doc.circle(26, 25, 0.9, 'F');
-
-    // Snowflake symbol on cargo box (white lines)
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(0.35);
-    doc.line(22.5, 19.5, 22.5, 23); // vertical
-    doc.line(20.75, 21.25, 24.25, 21.25); // horizontal
-    doc.line(21.4, 20.15, 23.6, 22.35); // diagonal
-    doc.line(21.4, 22.35, 23.6, 20.15); // diagonal
-
-    // Wrench symbol below/next to truck
-    doc.setDrawColor(120, 130, 140);
-    doc.setLineWidth(0.6);
-    doc.line(31, 18.5, 34, 21.5); // Handle of the wrench
-    doc.setFillColor(120, 130, 140);
-    doc.circle(31, 18.5, 0.8, 'F'); // head of wrench
-    doc.setFillColor(255, 255, 255);
-    doc.circle(31, 18.5, 0.3, 'F'); // wrench opening cutout
-
-    // Brand name "RECUPERAR"
-    doc.setTextColor(0, 186, 198); // Teal
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(11.5);
-    doc.text('RECUPERAR', 36, 23.5);
-
-    doc.setTextColor(30, 41, 59); // Slate
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(4.2);
-    doc.text('AR CONDICIONADO VEÍCULOS PESADOS', 36, 27.5);
+    doc.rect(15, 15, 55, 35); // Border around the logo
+    if (logoBase64) {
+      doc.addImage(logoBase64, 'JPEG', 15.5, 15.5, 54, 34);
+    } else {
+      // Fallback
+      doc.setTextColor(0, 186, 198);
+      doc.setFont('Helvetica', 'bold');
+      doc.setFontSize(13);
+      doc.text('RECUPERAR', 22, 33);
+    }
 
 
     // --- DADOS DA RECUPERAR (Topo Direito) ---
@@ -192,8 +179,7 @@ export default function BudgetView({
 
     // Coluna Esquerda
     doc.text('CNPJ: 08.879.982/0001-45', 15, 78);
-    doc.text('Inscrição Estadual: Isento', 15, 82);
-    doc.text('Seropédica - RJ', 15, 86);
+    doc.text('Seropédica - RJ', 15, 82);
 
     // Coluna Direita
     doc.text('Logradouro: Rodovia Presidente Dutra, 42', 100, 78);
