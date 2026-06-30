@@ -63,66 +63,211 @@ export default function BudgetView({
       format: 'a4'
     });
 
-    const dataFormatada = dataReferencia.split('-').reverse().join('/');
+    const drawTableHeader = (d: jsPDF, yCoord: number, isReport: boolean) => {
+      // Teal/cyan header bar (Clyar brand color `#00BAC6`)
+      d.setFillColor(0, 186, 198);
+      d.rect(15, yCoord, 180, 6, 'F');
+      
+      d.setTextColor(255, 255, 255);
+      d.setFont('Helvetica', 'bold');
+      d.setFontSize(8);
+      
+      if (isReport) {
+        d.text('Descrição do Serviço / Manutenção', 17, yCoord + 4.2);
+        d.text('Quantidade', 193, yCoord + 4.2, { align: 'right' });
+      } else {
+        d.text('Descrição do Serviço / Manutenção', 17, yCoord + 4.2);
+        d.text('Quantidade', 140, yCoord + 4.2, { align: 'right' });
+        d.text('Valor Unit. (R$)', 168, yCoord + 4.2, { align: 'right' });
+        d.text('Valor Total (R$)', 193, yCoord + 4.2, { align: 'right' });
+      }
+    };
 
-    // Estilização minimalista e profissional do PDF
-    doc.setFillColor(15, 23, 42); // Slate escuro
-    doc.rect(0, 0, 210, 30, 'F'); // Cabeçalho colorido topo
+    // --- LOGO RECUPERAR (Caminhão Baú, Ar Condicionado e Chave de Manutenção) ---
+    // Let's draw the Logo box: x=15, y=15, width=55, height=20 (Ends at x=70, y=35)
+    doc.setDrawColor(218, 225, 231);
+    doc.setLineWidth(0.3);
+    doc.rect(15, 15, 55, 20); // Border of the logo box
 
-    doc.setTextColor(255, 255, 255);
+    // Truck cargo (baú) in Teal
+    doc.setFillColor(0, 186, 198);
+    doc.rect(18, 18, 9, 6.5, 'F');
+
+    // Truck cabin in Slate-800
+    doc.setFillColor(30, 41, 59);
+    doc.rect(27, 20.5, 3.5, 4, 'F');
+
+    // Truck cabin window
+    doc.setFillColor(255, 255, 255);
+    doc.rect(29, 21.2, 1.2, 1.5, 'F');
+
+    // Wheels
+    doc.setFillColor(15, 23, 42);
+    doc.circle(20.5, 25, 0.9, 'F');
+    doc.circle(26, 25, 0.9, 'F');
+
+    // Snowflake symbol on cargo box (white lines)
+    doc.setDrawColor(255, 255, 255);
+    doc.setLineWidth(0.35);
+    doc.line(22.5, 19.5, 22.5, 23); // vertical
+    doc.line(20.75, 21.25, 24.25, 21.25); // horizontal
+    doc.line(21.4, 20.15, 23.6, 22.35); // diagonal
+    doc.line(21.4, 22.35, 23.6, 20.15); // diagonal
+
+    // Wrench symbol below/next to truck
+    doc.setDrawColor(120, 130, 140);
+    doc.setLineWidth(0.6);
+    doc.line(31, 18.5, 34, 21.5); // Handle of the wrench
+    doc.setFillColor(120, 130, 140);
+    doc.circle(31, 18.5, 0.8, 'F'); // head of wrench
+    doc.setFillColor(255, 255, 255);
+    doc.circle(31, 18.5, 0.3, 'F'); // wrench opening cutout
+
+    // Brand name "RECUPERAR"
+    doc.setTextColor(0, 186, 198); // Teal
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(ocultarValores ? 'RELATÓRIO DOS SERVIÇOS' : 'ORÇAMENTO DOS SERVIÇOS', 15, 18);
+    doc.setFontSize(11.5);
+    doc.text('RECUPERAR', 36, 23.5);
 
-    doc.setTextColor(34, 197, 94); // Verde (emerald)
+    doc.setTextColor(30, 41, 59); // Slate
     doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(16);
-    doc.text(dataFormatada, 160, 18);
+    doc.setFontSize(4.2);
+    doc.text('AR CONDICIONADO VEÍCULOS PESADOS', 36, 27.5);
 
-    // Corpo de conteúdo do PDF
-    doc.setTextColor(30, 41, 59); // Slate de texto escuro
-    let y = 45;
+
+    // --- DADOS DA RECUPERAR (Topo Direito) ---
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10.5);
+    doc.text('RECUPERAR', 195, 18, { align: 'right' });
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.text('www.recuperar.com.br', 195, 22, { align: 'right' });
+
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105);
+    doc.text('CNPJ: 21.598.076/0001-30', 195, 26, { align: 'right' });
+    doc.text('Inscrição Estadual: 86.846.43-8', 195, 30, { align: 'right' });
+    doc.text('Inscrição Municipal: 0', 195, 34, { align: 'right' });
+    doc.text('RUA JOAO PIZARRO, 00135', 195, 38, { align: 'right' });
+    doc.text('RAMOS', 195, 42, { align: 'right' });
+    doc.text('Rio de Janeiro - RJ - CEP: 21031-170', 195, 46, { align: 'right' });
+    doc.text('Telefone: (21) 3549-6641', 195, 50, { align: 'right' });
+
+
+    // --- TÍTULO DO DOCUMENTO ---
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.setTextColor(15, 23, 42);
+    const osNumber = dataReferencia.replace(/-/g, '');
+    const titleText = ocultarValores 
+      ? `Relatório de Serviço Nº ${osNumber}`
+      : `Orçamento de Serviço Nº ${osNumber}`;
+    doc.text(titleText, 15, 59);
+
+
+    // --- INFORMAÇÕES DO CLIENTE (PEO NOVA DISTRIBUIDORA) ---
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text('Informações do Cliente', 15, 66);
+
+    // Separador
+    doc.setDrawColor(220, 225, 230);
+    doc.setLineWidth(0.2);
+    doc.line(15, 68, 195, 68);
+
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42);
+    doc.text('PEO NOVA DISTRIBUIDORA', 15, 73);
+
+    // Detalhes do Cliente
+    doc.setFont('Helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
+
+    // Coluna Esquerda
+    doc.text('CNPJ: 23.373.000/0011-04', 15, 78);
+    doc.text('Inscrição Estadual: 10226449', 15, 82);
+    doc.text('societario@grupovamos.com.br', 15, 86);
+
+    // Coluna Direita
+    doc.text('AVENIDA BRASIL, 08191 - ENTRADA SUPLEMENTAR', 100, 78);
+    doc.text('RAMOS - Rio de Janeiro - RJ - CEP: 21030-000', 100, 82);
+    doc.text('Telefone: (11) 2377-7000', 100, 86);
+
+
+    // --- SEÇÃO LISTA DOS SERVIÇOS ---
+    doc.setFont('Helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text(ocultarValores ? 'Lista de Manutenções' : 'Lista dos Serviços', 15, 94);
+
+    // Linha de divisão antes da tabela
+    doc.setDrawColor(220, 225, 230);
+    doc.setLineWidth(0.2);
+    doc.line(15, 96, 195, 96);
+
+    let currentY = 99;
+    drawTableHeader(doc, currentY, ocultarValores);
+    currentY += 11; // spacing to start rows
 
     const veiculosComManutencao = veiculosComOrcamentosParaDia.filter(item => item.manutencoes.length > 0);
 
     if (veiculosComManutencao.length === 0) {
       doc.setFont('Helvetica', 'italic');
-      doc.setFontSize(11);
-      doc.text('Nenhuma manutenção registrada para o dia de referência.', 15, y);
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text('Nenhuma manutenção registrada para o dia de referência.', 15, currentY);
     } else {
       veiculosComManutencao.forEach((item) => {
-        // Evita quebra de página inadequada
-        if (y > 240) {
+        // Page overflow check for Vehicle group header
+        if (currentY > 260) {
           doc.addPage();
-          y = 25;
+          currentY = 25;
+          drawTableHeader(doc, currentY, ocultarValores);
+          currentY += 11;
         }
 
-        // Bloco do Veículo
-        doc.setFillColor(248, 250, 252); // Fundo sutil cinza claro para o caminhão
-        doc.rect(15, y - 5, 180, 8, 'F');
+        // Vehicle row background (light ice blue/teal hue for highlights)
+        doc.setFillColor(240, 252, 253);
+        doc.rect(15, currentY - 5, 180, 7, 'F');
 
+        // Draw Placa/Brand/Model
         doc.setFont('Helvetica', 'bold');
-        doc.setFontSize(10);
-        // PLACA, MARCA E MODELO
-        doc.text(`PLACA: ${item.veiculo.placa} | MARCA: ${item.veiculo.marcaCaminhao.toUpperCase()} | MODELO: ${item.veiculo.modelo.toUpperCase()}`, 17, y);
-        
-        // Custo fixo estabelecido no canto direito (ocultado se for relatório)
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+        const truckDesc = `VEÍCULO: PLACA ${item.veiculo.placa} - ${item.veiculo.marcaCaminhao.toUpperCase()} ${item.veiculo.modelo.toUpperCase()}`;
+        doc.text(truckDesc, 17, currentY);
+
+        // Right side values on vehicle level (if not report)
         if (!ocultarValores) {
-          doc.text(`R$ ${item.totalDoVeiculoNoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 165, y);
+          doc.text('1,00', 140, currentY, { align: 'right' });
+          doc.text(item.totalDoVeiculoNoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 168, currentY, { align: 'right' });
+          doc.text(item.totalDoVeiculoNoDia.toLocaleString('pt-BR', { minimumFractionDigits: 2 }), 193, currentY, { align: 'right' });
+        } else {
+          doc.text('1,00', 193, currentY, { align: 'right' });
         }
 
-        y += 8;
+        currentY += 7;
 
-        // Lista de manutenções registradas abaixo do veículo
+        // Draw sub-items (individual manutenções)
         item.manutencoes.forEach((m) => {
-          if (y > 260) {
+          if (currentY > 260) {
             doc.addPage();
-            y = 25;
+            currentY = 25;
+            drawTableHeader(doc, currentY, ocultarValores);
+            currentY += 11;
           }
 
           doc.setFont('Helvetica', 'normal');
-          doc.setFontSize(9);
-          
+          doc.setFontSize(8);
+          doc.setTextColor(51, 65, 85); // Slate-700
+
           let cleanDesc = m.descricao;
           const startsWithRevisao = m.descricao.toUpperCase().startsWith('(REVISÃO)');
           const isRevision = startsWithRevisao;
@@ -131,42 +276,83 @@ export default function BudgetView({
             cleanDesc = m.descricao.substring(9).trim();
           }
           
-          const pmsLine = isRevision ? `• (REVISÃO) ${cleanDesc}` : `• ${cleanDesc}`;
-          
-          // Tratamento de quebra automática de linha para descrição longa
-          const descLineas = doc.splitTextToSize(pmsLine, 170);
-          descLineas.forEach((linha: string) => {
-            if (y > 260) {
+          const labelPrefix = isRevision ? `[REVISÃO] ` : ``;
+          const textToPrint = `• ${labelPrefix}${cleanDesc}`;
+
+          // Wrap long descriptions beautifully
+          const wrapWidth = ocultarValores ? 165 : 110;
+          const descLines = doc.splitTextToSize(textToPrint, wrapWidth);
+
+          descLines.forEach((linha: string, index: number) => {
+            if (currentY > 260) {
               doc.addPage();
-              y = 25;
+              currentY = 25;
+              drawTableHeader(doc, currentY, ocultarValores);
+              currentY += 11;
             }
-            doc.text(linha, 20, y);
-            y += 5;
+
+            doc.text(linha, 20, currentY);
+
+            // Print service value notes next to the description's first line
+            if (index === 0) {
+              if (!ocultarValores) {
+                doc.setFont('Helvetica', 'italic');
+                doc.setFontSize(7.5);
+                doc.setTextColor(148, 163, 184); // Slate 400
+                doc.text('-', 140, currentY, { align: 'right' });
+                doc.text('Incluso', 168, currentY, { align: 'right' });
+                doc.text('Incluso', 193, currentY, { align: 'right' });
+                // Reset font
+                doc.setFont('Helvetica', 'normal');
+                doc.setFontSize(8);
+                doc.setTextColor(51, 65, 85);
+              } else {
+                doc.text('-', 193, currentY, { align: 'right' });
+              }
+            }
+
+            currentY += 4.5;
           });
         });
 
-        y += 4; // Espaçamento entre os caminhões listados
+        // Add small line separator under the vehicle group
+        doc.setDrawColor(226, 232, 240); // Slate 200
+        doc.setLineWidth(0.2);
+        doc.line(15, currentY - 2, 195, currentY - 2);
+        
+        currentY += 2.5; // padding before next vehicle
       });
     }
 
-    // Seção final com a soma total das manutenções (ocultado se for relatório)
+    // Soma total consolidado (only if not report)
     if (!ocultarValores) {
-      if (y > 240) {
+      if (currentY > 240) {
         doc.addPage();
-        y = 25;
+        currentY = 25;
       }
 
-      y += 5;
-      doc.setDrawColor(203, 213, 225); // Slate-200 border line divider
-      doc.setLineWidth(0.5);
-      doc.line(15, y, 195, y);
-      y += 10;
+      currentY += 6;
+      doc.setDrawColor(148, 163, 184); // Slate 400
+      doc.setLineWidth(0.3);
+      doc.line(120, currentY, 195, currentY); // Line separating table from totals
+      currentY += 6;
 
-      // Linha de total consolidado
+      doc.setFont('Helvetica', 'normal');
+      doc.setFontSize(8.5);
+      doc.setTextColor(71, 85, 105);
+      doc.text('Descontos:', 150, currentY, { align: 'right' });
+      doc.text('R$ 0,00', 193, currentY, { align: 'right' });
+
+      currentY += 5;
+      doc.text('Soma Subtotal:', 150, currentY, { align: 'right' });
+      doc.text(`R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 193, currentY, { align: 'right' });
+
+      currentY += 6;
       doc.setFont('Helvetica', 'bold');
       doc.setFontSize(12);
-      doc.text('SOMA TOTAL DAS MANUTENÇÕES:', 15, y);
-      doc.text(`R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 165, y);
+      doc.setTextColor(15, 23, 42);
+      doc.text('Total:', 150, currentY, { align: 'right' });
+      doc.text(`R$ ${totalGeralDiario.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, 193, currentY, { align: 'right' });
     }
 
     return doc;
