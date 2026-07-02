@@ -1331,7 +1331,7 @@ export default function VehiclesView({
                 {opcoesPredefinidas.length === 0 ? (
                   <p className="text-xs italic text-slate-500 bg-[#020617] p-3 rounded-xl border border-slate-800 text-center">Nenhuma opção na lista rápida. Adicione uma nova abaixo.</p>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                  <div className="grid grid-cols-1 gap-2 max-h-56 overflow-y-auto pr-1">
                     {opcoesPredefinidas.map(op => {
                       const isSelecionado = textoManutencao.includes(op);
                       return (
@@ -1346,7 +1346,7 @@ export default function VehiclesView({
                           <button
                             type="button"
                             onClick={() => toggleOpcaoPredefinida(op)}
-                            className="flex-1 text-left p-2.5 truncate cursor-pointer"
+                            className="flex-1 text-left p-2.5 whitespace-normal break-words cursor-pointer"
                           >
                             {op}
                           </button>

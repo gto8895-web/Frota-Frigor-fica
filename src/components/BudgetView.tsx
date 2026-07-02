@@ -85,7 +85,7 @@ export default function BudgetView({
     };
 
     // --- LOGO RECUPERAR ---
-    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15, 14, 55, 36.6);
+    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15, 12, 38, 38);
 
 
     // --- DADOS DA RECUPERAR (Topo Direito) ---
