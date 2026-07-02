@@ -85,7 +85,7 @@ export default function BudgetView({
     };
 
     // --- LOGO RECUPERAR ---
-    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15, 12, 38, 38);
+    doc.addImage(RECUPERAR_LOGO_BASE64, 'JPEG', 15, 12, 57, 38);
 
 
     // --- DADOS DA RECUPERAR (Topo Direito) ---
@@ -93,22 +93,6 @@ export default function BudgetView({
     doc.setFont('Helvetica', 'bold');
     doc.setFontSize(10.5);
     doc.text('RECUPERAR', 195, 18, { align: 'right' });
-
-    doc.setTextColor(15, 23, 42);
-    doc.setFont('Helvetica', 'bold');
-    doc.setFontSize(7.5);
-    doc.text('www.recuperar.com.br', 195, 22, { align: 'right' });
-
-    doc.setFont('Helvetica', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(71, 85, 105);
-    doc.text('CNPJ: 21.598.076/0001-30', 195, 26, { align: 'right' });
-    doc.text('Inscrição Estadual: 86.846.43-8', 195, 30, { align: 'right' });
-    doc.text('Inscrição Municipal: 0', 195, 34, { align: 'right' });
-    doc.text('RUA JOAO PIZARRO, 00135', 195, 38, { align: 'right' });
-    doc.text('RAMOS', 195, 42, { align: 'right' });
-    doc.text('Rio de Janeiro - RJ - CEP: 21031-170', 195, 46, { align: 'right' });
-    doc.text('Telefone: (21) 3549-6641', 195, 50, { align: 'right' });
 
 
     // --- TÍTULO DO DOCUMENTO ---
